@@ -21,29 +21,23 @@ class AimCalculator {
         return SHOOT_DATA[0][col];
     }
 
-    /**
-     * [逻辑改动 2]：包含 2 次补偿迭代的自瞄解算
-     */
+    // 继承速度的虚拟靶点预测 (原封不动保留，推导非常完美)
     public static AimResult solveAim(double rx, double ry, double vx, double vy, double tx, double ty) {
         double dx = tx - rx;
         double dy = ty - ry;
         double dist = Math.hypot(dx, dy);
         if (dist < 0.1) return null;
 
-        // 初始估计：基于当前静止距离获取飞行时间
         double tf = interpolate(dist, 3);
         double vDist = dist;
 
-        // 迭代 2 次以精细化飞行时间补偿（解决相对位移导致的 tf 偏差）
         for (int i = 0; i < 2; i++) {
             double predictedX = tx - (vx * tf);
             double predictedY = ty - (vy * tf);
-            // 注意：这里是目标相对于机器人的预测视距离
             vDist = Math.hypot(predictedX - rx, predictedY - ry);
-            tf = interpolate(vDist, 3); // 更新更准确的飞行时间
+            tf = interpolate(vDist, 3);
         }
 
-        // 计算最终补偿后的角度
         double finalDX = dx - vx * tf;
         double finalDY = dy - vy * tf;
 
