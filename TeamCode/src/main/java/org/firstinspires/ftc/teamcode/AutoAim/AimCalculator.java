@@ -21,7 +21,6 @@ class AimCalculator {
         return SHOOT_DATA[0][col];
     }
 
-    // 继承速度的虚拟靶点预测 (原封不动保留，推导非常完美)
     public static AimResult solveAim(double rx, double ry, double vx, double vy, double tx, double ty) {
         double dx = tx - rx;
         double dy = ty - ry;

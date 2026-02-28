@@ -43,7 +43,6 @@ public class IntelligentTurretAutoAim extends LinearOpMode {
 
     private long lastLoopTime = 0;
 
-    // [修复点 3]: 分离真实加速度计算和速度平滑预测的变量
     private double lastRawVxField = 0;
     private double lastRawVyField = 0;
     private double lastSmoothVxField = 0;
@@ -54,7 +53,6 @@ public class IntelligentTurretAutoAim extends LinearOpMode {
 
     @Override
     public void runOpMode() {
-        // [修复点 4]: 强化硬件单设备隔离，缺失任何设备都不会崩溃
         try {
             robotPose = new PinpointPoseProvider(hardwareMap, "odo");
             robotPose.initialize();
@@ -100,25 +98,30 @@ public class IntelligentTurretAutoAim extends LinearOpMode {
 
             double speed = Math.hypot(rVx, rVy);
 
-            // [逻辑安全点]: Limelight 更新包裹在判空内
             if (ll != null) {
                 LLResult result = ll.getLatestResult();
                 if (result != null && result.isValid() && speed < STATIONARY_SPEED_LIMIT) {
                     Pose3D botpose = result.getBotpose();
-                    double llX_Corner = (botpose.getPosition().x * 39.3701) + FIELD_OFFSET_X;
-                    double llY_Corner = (botpose.getPosition().y * 39.3701) + FIELD_OFFSET_Y;
-                    double llHeading = botpose.getOrientation().getYaw(AngleUnit.RADIANS);
+
+                    double llRawX_Meters = botpose.getPosition().x;
+                    double llRawY_Meters = botpose.getPosition().y;
+                    double llRawYaw_Rad = botpose.getOrientation().getYaw(AngleUnit.RADIANS);
+
+                    double targetWorldX_Inches = (llRawY_Meters * 39.3701) + FIELD_OFFSET_X;
+                    double targetWorldY_Inches = (-llRawX_Meters * 39.3701) + FIELD_OFFSET_Y;
+
+                    double mappedHeading_Rad = AngleUnit.normalizeRadians(llRawYaw_Rad + Math.PI);
 
                     double latency = (result.getCaptureLatency() + result.getTargetingLatency()) / 1000.0;
                     Pose2D correctedPose = new Pose2D(DistanceUnit.INCH,
-                            llX_Corner + (rVx * latency),
-                            llY_Corner + (rVy * latency),
-                            AngleUnit.RADIANS, llHeading);
+                            targetWorldX_Inches + (rVx * latency),
+                            targetWorldY_Inches + (rVy * latency),
+                            AngleUnit.RADIANS, mappedHeading_Rad);
+
                     robotPose.setPose(correctedPose);
                 }
             }
 
-            // 完美运动学保留
             double cosH = Math.cos(rH_Rad);
             double sinH = Math.sin(rH_Rad);
             double turretX = rX + (TURRET_OFFSET_FWD * (-sinH)) + (TURRET_OFFSET_LEFT * (-cosH));
@@ -128,7 +131,6 @@ public class IntelligentTurretAutoAim extends LinearOpMode {
             double turretVx = rVx + tanVx;
             double turretVy = rVy + tanVy;
 
-            // [修复点 3 核心]: 加速度计算必须使用 Raw 数据，否则会被滤波钝化
             double dt = (System.nanoTime() - lastLoopTime) / 1.0E9;
             if(dt < 0.001) dt = 0.001;
 
@@ -143,7 +145,6 @@ public class IntelligentTurretAutoAim extends LinearOpMode {
                 isImpactDetected = false;
             }
 
-            // 仅对预测自瞄使用滤波，保证准星平滑
             double alpha = isImpactDetected ? ALPHA_IMPACT : ALPHA_NORMAL;
             double smoothVx = lastSmoothVxField * (1.0 - alpha) + turretVx * alpha;
             double smoothVy = lastSmoothVyField * (1.0 - alpha) + turretVy * alpha;
@@ -160,10 +161,8 @@ public class IntelligentTurretAutoAim extends LinearOpMode {
                 double targetAbsHeading = aim.algYaw - 90.0;
                 double currentChassisHeading = robotPose.getHeading(AngleUnit.DEGREES);
 
-                // 安全读取当前云台机械位置 (解决空指针)
                 double turretRelDeg = (turretEncoder != null) ? (turretEncoder.getCurrentPosition() / TURRET_TICKS_PER_REV * 360.0) : 0.0;
 
-                // [修复点 2 核心]: 统一逻辑流，让撞击保护和正常模式都接受死区洗礼
                 double currentGunAbsHeading;
                 if (isImpactDetected && turretPose != null) {
                     // 如果发生撞击，依靠云台 IMU 获知当前炮管绝对朝向
@@ -197,7 +196,6 @@ public class IntelligentTurretAutoAim extends LinearOpMode {
             // ==========================================
             // 极高密度的仿真与测试 Telemetry 打印
             // ==========================================
-            // [修复点 1]: 彻底解决空指针问题
             double safeTurretPos = (turretEncoder != null) ? (turretEncoder.getCurrentPosition() / TURRET_TICKS_PER_REV * 360.0) : 0.0;
 
             telemetry.addData("--- SYSTEM STATUS ---", isImpactDetected ? "[! IMPACT !]" : "[ OK ]");
