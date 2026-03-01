@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.AutoAim;
 
-class AimCalculator {
+public class AimCalculator {
+    // 弹道数据：{距离(inch), RPM, Pitch, 飞行时间(s)}
     private static final double[][] SHOOT_DATA = {
             {20.0, 2100.0, 0.35, 0.15},
             {60.0, 2720.0, 0.42, 0.35},
@@ -30,6 +31,7 @@ class AimCalculator {
         double tf = interpolate(dist, 3);
         double vDist = dist;
 
+        // 迭代两次以提高预测精度
         for (int i = 0; i < 2; i++) {
             double predictedX = tx - (vx * tf);
             double predictedY = ty - (vy * tf);
