@@ -219,4 +219,10 @@ public class AutoAimSubsystem {
             telemetry.addData("PID Error", "%.2f°", error);
         }
     }
+    public void setInitialPose(Pose2D pose) {
+        if (robotPose != null) {
+            robotPose.setPose(pose);
+            telemetry.addData("[System]", "Odometry Pose Overridden.");
+        }
+    }
 }
