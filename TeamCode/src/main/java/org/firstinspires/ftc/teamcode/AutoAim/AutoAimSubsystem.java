@@ -25,14 +25,14 @@ public class AutoAimSubsystem {
     // ================= 常量配置 =================
     public final double FIELD_OFFSET_X = 72.0;
     public final double FIELD_OFFSET_Y = 72.0;
-    public final double TURRET_OFFSET_FWD = -5.0; // 以车旋转中心为原点建立标准笛卡尔平面坐标系，云台在y方向的位置偏移
-    public final double TURRET_OFFSET_LEFT = 0.0; // 以车旋转中心为原点建立标准笛卡尔平面坐标系，云台在x方向的位置偏移
-    public final double TURRET_TICKS_PER_REV = 8192.0; // 云台转一整圈（360°）时，贯穿轴编码器增加的数值。
-    public final double TURRET_SOFT_LIMIT = 260.0; // 硬限位角度-10
-    public final double STATIONARY_SPEED_LIMIT = 5.0;  // 车速小于多少信赖ll
-    public final double MAX_PHYSICAL_ACCEL = 500.0;
+    public final double TURRET_OFFSET_FWD = -2.0;          // 以车旋转中心为原点建立标准笛卡尔平面坐标系，云台在y方向的位置偏移
+    public final double TURRET_OFFSET_LEFT = 0.0;          // 以车旋转中心为原点建立标准笛卡尔平面坐标系，云台在x方向的位置偏移
+    public final double TURRET_TICKS_PER_REV = 8192.0;     // 云台转一·整圈（360°）时，贯穿轴编码器增加的数值
+    public final double TURRET_SOFT_LIMIT = 190.0;         // 硬限位角度-10
+    public final double STATIONARY_SPEED_LIMIT = 5.0;      // 车速小于多少信赖ll
+    public final double MAX_PHYSICAL_ACCEL = 1000;
     public final double IMPACT_COOLDOWN_MS = 300.0;
-    public final double ALPHA_NORMAL = 0.80;     // 低通滤波器
+    public final double ALPHA_NORMAL = 0.80;               // 低通滤波器
     public final double ALPHA_IMPACT = 0.05;
 
     // ================= 状态变量 =================

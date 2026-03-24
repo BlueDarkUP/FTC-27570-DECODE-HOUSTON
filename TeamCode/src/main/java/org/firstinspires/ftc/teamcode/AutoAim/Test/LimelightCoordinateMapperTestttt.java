@@ -8,8 +8,8 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 
-@TeleOp(name="DEBUG: Limelight Coordinate Mapper", group="Test")
-public class LimelightCoordinateMapperTest extends LinearOpMode {
+@TeleOp(name="DEBUG: Limelight Coordinate Mapperfff", group="Test")
+public class LimelightCoordinateMapperTestttt extends LinearOpMode {
 
     private Limelight3A ll;
 
