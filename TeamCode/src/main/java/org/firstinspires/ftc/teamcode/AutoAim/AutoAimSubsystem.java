@@ -19,7 +19,6 @@ public class AutoAimSubsystem {
     private PinpointPoseProvider robotPose;
     private PinpointPoseProvider turretPose;
     private Limelight3A ll;
-    private DcMotorEx turretEncoder;
     private Telemetry telemetry;
 
     // ================= 常量配置 =================
@@ -74,9 +73,8 @@ public class AutoAimSubsystem {
         }
 
         try {
-            turretPose = new PinpointPoseProvider(hardwareMap, "turretPinpoint");
+            turretPose = new PinpointPoseProvider(hardwareMap, "turretyaw");
             turretPose.initialize();
-            turretEncoder = hardwareMap.get(DcMotorEx.class, "turretEncoder");
         } catch (Exception e) {
             telemetry.addLine("[WARN] Turret hardware missing. Virtual Turret Mode Active.");
         }
@@ -98,7 +96,7 @@ public class AutoAimSubsystem {
         robotPose.update();
         if (turretPose != null) turretPose.update();
 
-        double rX = robotPose.getX(DistanceUnit.INCH);
+        double rX = -robotPose.getX(DistanceUnit.INCH);
         double rY = robotPose.getY(DistanceUnit.INCH);
         double rH_Rad = robotPose.getHeading(AngleUnit.RADIANS);
         double rVx = robotPose.getXVelocity(DistanceUnit.INCH);
@@ -182,14 +180,10 @@ public class AutoAimSubsystem {
 
             double targetAbsHeading = aim.algYaw - 90.0;
             double currentChassisHeading = robotPose.getHeading(AngleUnit.DEGREES);
-            double turretRelDeg = (turretEncoder != null) ? (turretEncoder.getCurrentPosition() / TURRET_TICKS_PER_REV * 360.0) : 0.0;
 
-            double currentGunAbsHeading;
-            if (isImpactDetected && turretPose != null) {
-                currentGunAbsHeading = turretPose.getHeading(AngleUnit.DEGREES);
-            } else {
-                currentGunAbsHeading = currentChassisHeading + turretRelDeg;
-            }
+            double currentGunAbsHeading = turretPose != null ? turretPose.getHeading(AngleUnit.DEGREES) : currentChassisHeading;
+
+            double turretRelDeg = AngleUnit.normalizeDegrees(currentGunAbsHeading - currentChassisHeading);
 
             double rawTurnDiff = AngleUnit.normalizeDegrees(targetAbsHeading - currentGunAbsHeading);
             double futurePosition = turretRelDeg + rawTurnDiff;
@@ -222,7 +216,8 @@ public class AutoAimSubsystem {
     public void setInitialPose(Pose2D pose) {
         if (robotPose != null) {
             robotPose.setPose(pose);
-            telemetry.addData("[System]", "Odometry Pose Overridden.");
+            robotPose.update(); // 【关键增加】：强制刷新一次，让 I2C 总线立刻应用该坐标
+            telemetry.addData("[System]", "Odometry Pose Overridden to X: " + (-pose.getX(DistanceUnit.INCH)));
         }
     }
 }

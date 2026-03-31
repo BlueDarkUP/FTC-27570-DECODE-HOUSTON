@@ -18,7 +18,7 @@ public class PinpointPoseProvider implements IPoseProvider {
 
     public void initialize() {
         // 根据您的机器人配置进行设置
-        odo.setOffsets(160,-75,DistanceUnit.MM);
+        odo.setOffsets(101.16,-160,DistanceUnit.MM);
         odo.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
         odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD, GoBildaPinpointDriver.EncoderDirection.REVERSED);
         reset(); // 初始重置
