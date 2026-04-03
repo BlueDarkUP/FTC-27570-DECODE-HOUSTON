@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.AutoAim;
 
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -20,19 +21,23 @@ public class AutoAimSubsystem {
     private PinpointPoseProvider turretPose;
     private Limelight3A ll;
     private Telemetry telemetry;
+    private DcMotorEx turretMotor;
 
     // ================= 常量配置 =================
     public final double FIELD_OFFSET_X = 72.0;
     public final double FIELD_OFFSET_Y = 72.0;
-    public final double TURRET_OFFSET_FWD = -2.0;          // 以车旋转中心为原点建立标准笛卡尔平面坐标系，云台在y方向的位置偏移
-    public final double TURRET_OFFSET_LEFT = 0.0;          // 以车旋转中心为原点建立标准笛卡尔平面坐标系，云台在x方向的位置偏移
-    public final double TURRET_TICKS_PER_REV = 8192.0;     // 云台转一·整圈（360°）时，贯穿轴编码器增加的数值
-    public final double TURRET_SOFT_LIMIT = 190.0;         // 硬限位角度-10
-    public final double STATIONARY_SPEED_LIMIT = 5.0;      // 车速小于多少信赖ll
+    public final double TURRET_OFFSET_FWD = -2.0;
+    public final double TURRET_OFFSET_LEFT = 0.0;
+    public final double TURRET_SOFT_LIMIT = 190.0;
+    public final double STATIONARY_SPEED_LIMIT = 5.0;
     public final double MAX_PHYSICAL_ACCEL = 1000;
     public final double IMPACT_COOLDOWN_MS = 300.0;
-    public final double ALPHA_NORMAL = 0.80;               // 低通滤波器
+    public final double ALPHA_NORMAL = 0.80;
     public final double ALPHA_IMPACT = 0.05;
+
+    private final double kP = 0.035;
+    private final double kI = 0.000;
+    private final double kD = 0.00145;
 
     // ================= 状态变量 =================
     private long lastLoopTime = 0;
@@ -43,12 +48,17 @@ public class AutoAimSubsystem {
     private boolean isImpactDetected = false;
     private ElapsedTime impactTimer = new ElapsedTime();
 
+    private double integralSum = 0;
+    private double lastError = 0;
+    private ElapsedTime pidTimer = new ElapsedTime();
+    private double currentTurretPower = 0;
+
     // ================= 返回值数据结构 =================
     public static class TurretCommand {
         public boolean hasTarget = false;
-        public double pidErrorDeg = 0;   // 发送给云台PID控制器的角度误差
-        public double targetRpm = 0;     // 发送给摩擦轮的目标RPM
-        public double targetPitch = 0;   // 发送给Pitch舵机的目标位置
+        public double pidErrorDeg = 0;
+        public double targetRpm = 0;
+        public double targetPitch = 0;
     }
 
     /**
@@ -78,17 +88,26 @@ public class AutoAimSubsystem {
         } catch (Exception e) {
             telemetry.addLine("[WARN] Turret hardware missing. Virtual Turret Mode Active.");
         }
+
+        try {
+            turretMotor = hardwareMap.get(DcMotorEx.class, "turret");
+            turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        } catch (Exception e) {
+            telemetry.addLine("[FATAL] Turret Motor missing.");
+        }
+
+        pidTimer.reset();
     }
 
     /**
-     * 主循环调用方法：计算瞄准参数
+     * 主循环调用方法：计算瞄准参数并自动控制云台电机
      * @param targetX 目标世界坐标X
      * @param targetY 目标世界坐标Y
-     * @return TurretCommand 包含所需的控制指令
+     * @return TurretCommand 包含所需的控制指令（给摩擦轮和Pitch舵机留作后用）
      */
     public TurretCommand update(double targetX, double targetY) {
         TurretCommand command = new TurretCommand();
-        if (robotPose == null) return command; // 里程计未就绪，直接返回
+        if (robotPose == null) return command;
 
         if (lastLoopTime == 0) lastLoopTime = System.nanoTime();
 
@@ -104,7 +123,7 @@ public class AutoAimSubsystem {
         double rOmega = robotPose.getHeadingVelocity(AngleUnit.RADIANS);
         double speed = Math.hypot(rVx, rVy);
 
-        // 2. 视觉辅助定位融合 (Limelight Relocalization)
+        // 2. 视觉辅助定位融合
         if (ll != null) {
             LLResult result = ll.getLatestResult();
             if (result != null && result.isValid() && speed < STATIONARY_SPEED_LIMIT) {
@@ -140,16 +159,15 @@ public class AutoAimSubsystem {
         // 4. 撞击检测与加速度滤波
         if (lastLoopTime == 0) {
             lastLoopTime = System.nanoTime();
-            // 初始化历史速度，防止第一帧求导爆炸
             lastRawVxField = turretVx;
             lastRawVyField = turretVy;
             lastSmoothVxField = turretVx;
             lastSmoothVyField = turretVy;
         }
 
-        double dt = (System.nanoTime() - lastLoopTime) / 1.0E9;
-        if(dt < 0.001) dt = 0.001;
-        double accel = Math.hypot((turretVx - lastRawVxField)/dt, (turretVy - lastRawVyField)/dt);
+        double dtNano = (System.nanoTime() - lastLoopTime) / 1.0E9;
+        if(dtNano < 0.001) dtNano = 0.001;
+        double accel = Math.hypot((turretVx - lastRawVxField)/dtNano, (turretVy - lastRawVyField)/dtNano);
         lastRawVxField = turretVx;
         lastRawVyField = turretVy;
 
@@ -180,43 +198,73 @@ public class AutoAimSubsystem {
 
             double targetAbsHeading = aim.algYaw - 90.0;
             double currentChassisHeading = robotPose.getHeading(AngleUnit.DEGREES);
-
             double currentGunAbsHeading = turretPose != null ? turretPose.getHeading(AngleUnit.DEGREES) : currentChassisHeading;
-
             double turretRelDeg = AngleUnit.normalizeDegrees(currentGunAbsHeading - currentChassisHeading);
 
             double rawTurnDiff = AngleUnit.normalizeDegrees(targetAbsHeading - currentGunAbsHeading);
             double futurePosition = turretRelDeg + rawTurnDiff;
 
-            // 线缆缠绕保护
+            // 线缆缠绕与死区保护
             if (futurePosition > TURRET_SOFT_LIMIT) futurePosition -= 360.0;
             else if (futurePosition < -TURRET_SOFT_LIMIT) futurePosition += 360.0;
 
-            // 死区截断保护
             if (futurePosition > TURRET_SOFT_LIMIT) futurePosition = TURRET_SOFT_LIMIT;
             if (futurePosition < -TURRET_SOFT_LIMIT) futurePosition = -TURRET_SOFT_LIMIT;
 
             command.pidErrorDeg = futurePosition - turretRelDeg;
         }
 
-        // 7. （可选）自动打印调试信息，保持原有的 Telemetry 体验
-        printTelemetry(aim, command.pidErrorDeg, rX, rY, accel);
+        // ================= 【核心新增】内置 PID 闭环控制 =================
+        if (turretMotor != null) {
+            if (command.hasTarget) {
+                double error = command.pidErrorDeg;
+                double dt = pidTimer.seconds();
+                if (dt == 0) dt = 0.001;
+
+                integralSum += error * dt;
+                double derivative = (error - lastError) / dt;
+
+                double power = (kP * error) + (kI * integralSum) + (kD * derivative);
+                power = Math.max(-1.0, Math.min(1.0, power)); // 限制在 [-1, 1] 之间
+
+                turretMotor.setPower(power);
+                currentTurretPower = power;
+
+                lastError = error;
+                pidTimer.reset();
+            } else {
+                // 如果丢失目标，断电清空缓存防止 Windup
+                turretMotor.setPower(0);
+                currentTurretPower = 0;
+                integralSum = 0;
+                lastError = 0;
+                pidTimer.reset();
+            }
+        }
+        // =============================================================
+
+        // 7. 自动打印调试信息
+        printTelemetry(aim, command.pidErrorDeg, rX, rY, targetX, targetY);
 
         return command;
     }
 
-    private void printTelemetry(AimCalculator.AimResult aim, double error, double rX, double rY, double accel) {
+    private void printTelemetry(AimCalculator.AimResult aim, double error, double rX, double rY, double targetX, double targetY) {
         telemetry.addData("AutoAim Status", isImpactDetected ? "[! IMPACT !]" : "[ OK ]");
         telemetry.addData("Chassis Pos", "X:%.1f  Y:%.1f", rX, rY);
         if(aim != null) {
+            telemetry.addData("Target Locked", "WorldX:%.0f WorldY:%.0f", targetX, targetY);
             telemetry.addData("Aim Command", "RPM: %.0f | Pitch: %.2f", aim.rpm, aim.pitch);
-            telemetry.addData("PID Error", "%.2f°", error);
+            telemetry.addData("Turret Control", "Pow: %.2f | Err: %.1f°", currentTurretPower, error);
+        } else {
+            telemetry.addLine("[Target] LOST or TOO CLOSE");
         }
     }
+
     public void setInitialPose(Pose2D pose) {
         if (robotPose != null) {
             robotPose.setPose(pose);
-            robotPose.update(); // 【关键增加】：强制刷新一次，让 I2C 总线立刻应用该坐标
+            robotPose.update();
             telemetry.addData("[System]", "Odometry Pose Overridden to X: " + (-pose.getX(DistanceUnit.INCH)));
         }
     }
