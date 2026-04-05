@@ -5,8 +5,8 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
-import org.firstinspires.ftc.teamcode.vision.EchoLapse.IPoseProvider;
-import org.firstinspires.ftc.teamcode.vision.EchoLapse.PinpointPoseProvider;
+import org.firstinspires.ftc.teamcode.Driver.EchoLapse.IPoseProvider;
+import org.firstinspires.ftc.teamcode.Driver.EchoLapse.PinpointPoseProvider;
 
 import java.util.Locale;
 

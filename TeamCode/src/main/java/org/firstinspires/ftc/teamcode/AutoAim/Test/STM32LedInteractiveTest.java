@@ -10,10 +10,10 @@ package org.firstinspires.ftc.teamcode.AutoAim.Test;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
-import org.firstinspires.ftc.teamcode.vision.KIRIN.STM32LedModule;
-import org.firstinspires.ftc.teamcode.vision.KIRIN.STM32LedModule.Color;
-import org.firstinspires.ftc.teamcode.vision.KIRIN.STM32LedModule.Direction;
-import org.firstinspires.ftc.teamcode.vision.KIRIN.STM32LedModule.FadeType;
+import org.firstinspires.ftc.teamcode.Driver.KIRIN.STM32LedModule;
+import org.firstinspires.ftc.teamcode.Driver.KIRIN.STM32LedModule.Color;
+import org.firstinspires.ftc.teamcode.Driver.KIRIN.STM32LedModule.Direction;
+import org.firstinspires.ftc.teamcode.Driver.KIRIN.STM32LedModule.FadeType;
 
 @TeleOp(name = "🎮 STM32 V3 LED 手柄双灯联调", group = "Demo")
 public class STM32LedInteractiveTest extends LinearOpMode {
