@@ -6,7 +6,6 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
-import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
@@ -43,21 +42,13 @@ public class AutoAimTeleOp extends LinearOpMode {
 
     // 飞轮与供弹参数
     private final double IDLE_VELOCITY = 1000.0;     // 怠速转速
-    private final double VELOCITY_TOLERANCE = 100.0; // 容差范围：±100
+    private final double VELOCITY_TOLERANCE = 100.0;
 
-    // PIDF 参数
     private final double kF = 0.0003;
-    private final double kP = 0.01;
-    private final double kI = 0.0;
-    private final double kD = 0.000001;
 
     // ================= 状态变量 =================
     private boolean isShootingMode = false;  // 是否处于发射模式
     private boolean lastCircleState = false; // 记录上一次按键状态（用于Toggle边缘检测）
-
-    private double integralSum = 0.0;
-    private double lastError = 0.0;
-    private ElapsedTime pidTimer = new ElapsedTime();
 
     @Override
     public void runOpMode() {
@@ -139,8 +130,6 @@ public class AutoAimTeleOp extends LinearOpMode {
         }
 
         // 比赛正式开始（按下 Start 键后执行到此处）
-        // 启动时重置 PID 定时器，防止第一帧 dt 爆炸过大
-        pidTimer.reset();
 
         // --------------------------------------------------
         // 5. 主循环 (TeleOp阶段)
@@ -209,33 +198,21 @@ public class AutoAimTeleOp extends LinearOpMode {
             }
 
             // ==========================================
-            // [六] 飞轮 PIDF 闭环控制与自然减速逻辑
+            // [六] 飞轮 Bang-Bang + Kf 控制逻辑
             // ==========================================
             double currentVelocity = motorSH.getVelocity();
-
-            double dt = pidTimer.seconds();
-            pidTimer.reset();
-            if (dt == 0) dt = 0.001; // 防止除以 0
-
             double error = targetVelocity - currentVelocity;
             double power = 0.0;
 
-            // 如果当前转速远超目标转速（例如切换回 Intake 怠速模式时），触发自然滑行
-            if (error < -VELOCITY_TOLERANCE) {
-                power = 0.0; // 切断输出，依靠初始化的 FLOAT 属性让飞轮由于阻力自然减速
-                integralSum = 0.0; // 必须清空积分！防止在这段期间累积巨大的负误差，导致后续重加速无力
-                lastError = error; // 仍然更新最后误差，保证下次进入 PID 时微分项不出错
+            if (currentVelocity < targetVelocity - VELOCITY_TOLERANCE) {
+                power = 1.0;
             }
-            // 否则（处于加速状态或转速维持在容差范围内），正常通过 PID 控制
+            else if (currentVelocity > targetVelocity + VELOCITY_TOLERANCE) {
+                power = 0.0;
+            }
             else {
-                integralSum += error * dt;
-                double derivative = (error - lastError) / dt;
-                lastError = error;
-
-                power = (targetVelocity * kF) + (error * kP) + (integralSum * kI) + (derivative * kD);
+                power = targetVelocity * kF;
             }
-
-            // 绝对禁止反转电流输出，飞轮的 power 必须限制在 0.0 到 1.0 之间
             power = Math.max(0.0, Math.min(1.0, power));
 
             motorSH.setPower(power);
@@ -247,10 +224,10 @@ public class AutoAimTeleOp extends LinearOpMode {
             if (isShootingMode) {
                 // 发射模式：严格受转速误差控制
                 if (Math.abs(error) <= VELOCITY_TOLERANCE && aimCommand.hasTarget) {
-                    motorIntake.setPower(1.0); // 速度达标且有目标，全速喂件
+                    motorIntake.setPower(1.0); // 速度在 Bang-Bang 容差内且有目标，全速喂件
                     telemetry.addData("🔴 发射系统", "开火中 (FIRE!)");
                 } else {
-                    motorIntake.setPower(0.0); // 掉速或加速中，强制停止喂件防卡弹
+                    motorIntake.setPower(0.0); // 掉速、加速或滑行降速中，强制停止喂件防卡弹
                     telemetry.addData("🔴 发射系统", "预热/调速中...");
                 }
             } else {
@@ -270,7 +247,7 @@ public class AutoAimTeleOp extends LinearOpMode {
             telemetry.addData("飞轮当前 RPM", currentVelocity);
             telemetry.addData("飞轮目标 RPM", targetVelocity);
             telemetry.addData("RPM 误差", error);
-            telemetry.addData("当前飞轮动力分配", "%.2f", power); // 新增遥测便于监控自然滑行状态
+            telemetry.addData("当前飞轮动力分配", "%.2f", power); // 监控 Bang-Bang 当前所处状态 (1.0 / 0.0 / kF)
 
             // autoAim 内部的遥测已经通过 update() 传入，只需统一下发
             telemetry.update();
