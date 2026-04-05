@@ -63,6 +63,7 @@ public class AutoAimSubsystem {
         public double pidErrorDeg = 0;
         public double targetRpm = 0;
         public double targetPitch = 0;
+        public double targetDistance = 0; // 新增：距离目标的绝对直线距离(英寸)
     }
 
     /**
@@ -188,11 +189,15 @@ public class AutoAimSubsystem {
                 turretX, turretY, smoothVx, smoothVy, targetX, targetY
         );
 
+        // 新增：计算并记录目标距离
+        double distanceToTarget = Math.hypot(targetX - turretX, targetY - turretY);
+
         // ================= 【核心修改】6. 软限位与长路径防缠绕解算 =================
         if (aim != null && turretMotor != null) {
             command.hasTarget = true;
             command.targetRpm = aim.rpm;
             command.targetPitch = aim.pitch;
+            command.targetDistance = distanceToTarget; // 赋值距离到指令包
 
             // 1. 获取物理底盘朝向和目标绝对朝向
             double targetAbsHeading = aim.algYaw - 90.0;
@@ -255,19 +260,19 @@ public class AutoAimSubsystem {
         }
         // =============================================================
 
-        // 7. 自动打印调试信息
-        printTelemetry(aim, command.pidErrorDeg, rX, rY, targetX, targetY);
+        // 7. 自动打印调试信息 (修改签名，传入包含距离信息的 command)
+        printTelemetry(aim, command, rX, rY, targetX, targetY);
 
         return command;
     }
 
-    private void printTelemetry(AimCalculator.AimResult aim, double error, double rX, double rY, double targetX, double targetY) {
+    private void printTelemetry(AimCalculator.AimResult aim, TurretCommand command, double rX, double rY, double targetX, double targetY) {
         telemetry.addData("AutoAim Status", isImpactDetected ? "[! IMPACT !]" : "[ OK ]");
         telemetry.addData("Chassis Pos", "X:%.1f  Y:%.1f", rX, rY);
-        if(aim != null) {
-            telemetry.addData("Target Locked", "WorldX:%.0f WorldY:%.0f", targetX, targetY);
+        if(aim != null && command.hasTarget) {
+            telemetry.addData("Target Locked", "WorldX:%.0f WorldY:%.0f | Dist: %.1f in", targetX, targetY, command.targetDistance);
             telemetry.addData("Aim Command", "RPM: %.0f | Pitch: %.2f", aim.rpm, aim.pitch);
-            telemetry.addData("Turret Control", "Pow: %.2f | Err: %.1f°", currentTurretPower, error);
+            telemetry.addData("Turret Control", "Pow: %.2f | Err: %.1f°", currentTurretPower, command.pidErrorDeg);
             telemetry.addData("Turret Physical Deg", turretMotor.getCurrentPosition() / TICKS_PER_DEGREE);
         } else {
             telemetry.addLine("[Target] LOST or TOO CLOSE");
