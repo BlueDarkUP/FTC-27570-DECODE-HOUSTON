@@ -28,7 +28,11 @@ public class AutoAimSubsystem {
     public final double FIELD_OFFSET_Y = 72.0;
     public final double TURRET_OFFSET_FWD = -2.0;
     public final double TURRET_OFFSET_LEFT = 0.0;
+
     public final double TURRET_SOFT_LIMIT = 190.0;
+    public final double TURRET_TICKS_PER_REV = 32000.0;
+    public final double TICKS_PER_DEGREE = TURRET_TICKS_PER_REV / 360.0;
+
     public final double STATIONARY_SPEED_LIMIT = 5.0;
     public final double MAX_PHYSICAL_ACCEL = 1000;
     public final double IMPACT_COOLDOWN_MS = 300.0;
@@ -92,6 +96,8 @@ public class AutoAimSubsystem {
         try {
             turretMotor = hardwareMap.get(DcMotorEx.class, "turret");
             turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            turretMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         } catch (Exception e) {
             telemetry.addLine("[FATAL] Turret Motor missing.");
         }
@@ -99,12 +105,6 @@ public class AutoAimSubsystem {
         pidTimer.reset();
     }
 
-    /**
-     * 主循环调用方法：计算瞄准参数并自动控制云台电机
-     * @param targetX 目标世界坐标X
-     * @param targetY 目标世界坐标Y
-     * @return TurretCommand 包含所需的控制指令（给摩擦轮和Pitch舵机留作后用）
-     */
     public TurretCommand update(double targetX, double targetY) {
         TurretCommand command = new TurretCommand();
         if (robotPose == null) return command;
@@ -146,7 +146,6 @@ public class AutoAimSubsystem {
             }
         }
 
-        // 3. 云台运动学换算
         double cosH = Math.cos(rH_Rad);
         double sinH = Math.sin(rH_Rad);
         double turretX = rX + (TURRET_OFFSET_FWD * (-sinH)) + (TURRET_OFFSET_LEFT * (-cosH));
@@ -156,7 +155,6 @@ public class AutoAimSubsystem {
         double turretVx = rVx + tanVx;
         double turretVy = rVy + tanVy;
 
-        // 4. 撞击检测与加速度滤波
         if (lastLoopTime == 0) {
             lastLoopTime = System.nanoTime();
             lastRawVxField = turretVx;
@@ -190,31 +188,46 @@ public class AutoAimSubsystem {
                 turretX, turretY, smoothVx, smoothVy, targetX, targetY
         );
 
-        // 6. 软限位与最短路径安全计算
-        if (aim != null) {
+        // ================= 【核心修改】6. 软限位与长路径防缠绕解算 =================
+        if (aim != null && turretMotor != null) {
             command.hasTarget = true;
             command.targetRpm = aim.rpm;
             command.targetPitch = aim.pitch;
 
+            // 1. 获取物理底盘朝向和目标绝对朝向
             double targetAbsHeading = aim.algYaw - 90.0;
             double currentChassisHeading = robotPose.getHeading(AngleUnit.DEGREES);
-            double currentGunAbsHeading = turretPose != null ? turretPose.getHeading(AngleUnit.DEGREES) : currentChassisHeading;
-            double turretRelDeg = AngleUnit.normalizeDegrees(currentGunAbsHeading - currentChassisHeading);
 
-            double rawTurnDiff = AngleUnit.normalizeDegrees(targetAbsHeading - currentGunAbsHeading);
-            double futurePosition = turretRelDeg + rawTurnDiff;
+            // 2. 利用新加装的编码器获取【不折叠】的真实物理相对角度
+            // 假设机器人启动时云台居中(0度)。如果是正反转反了，这里加个负号。
+            double physicalTurretRelDeg = turretMotor.getCurrentPosition() / TICKS_PER_DEGREE;
 
-            // 线缆缠绕与死区保护
-            if (futurePosition > TURRET_SOFT_LIMIT) futurePosition -= 360.0;
-            else if (futurePosition < -TURRET_SOFT_LIMIT) futurePosition += 360.0;
+            // 3. 计算想要到达的理想相对角度（可能会被映射到 -180 到 180）
+            double desiredRelDeg = targetAbsHeading - currentChassisHeading;
 
-            if (futurePosition > TURRET_SOFT_LIMIT) futurePosition = TURRET_SOFT_LIMIT;
-            if (futurePosition < -TURRET_SOFT_LIMIT) futurePosition = -TURRET_SOFT_LIMIT;
+            // 4. 计算从【当前真实位置】到【目标位置】的最短角度误差
+            double shortestPathError = AngleUnit.normalizeDegrees(desiredRelDeg - physicalTurretRelDeg);
 
-            command.pidErrorDeg = futurePosition - turretRelDeg;
+            // 5. 尝试按照最短路径得到的“未来物理位置”
+            double targetPhysicalDeg = physicalTurretRelDeg + shortestPathError;
+
+            // 6. 防缠绕/突破软限位逻辑 (核心修补)
+            // 如果走最短路径会超过软限位，那就必须强制它“走远路绕回去”（减去或加上360度）
+            if (targetPhysicalDeg > TURRET_SOFT_LIMIT) {
+                targetPhysicalDeg -= 360.0;
+            } else if (targetPhysicalDeg < -TURRET_SOFT_LIMIT) {
+                targetPhysicalDeg += 360.0;
+            }
+
+            // 7. 死区保护：如果“绕回去”之后依然超出软限位，说明目标完全在物理死区内，强行贴边停住
+            if (targetPhysicalDeg > TURRET_SOFT_LIMIT) targetPhysicalDeg = TURRET_SOFT_LIMIT;
+            if (targetPhysicalDeg < -TURRET_SOFT_LIMIT) targetPhysicalDeg = -TURRET_SOFT_LIMIT;
+
+            // 8. 最终送给PID的误差值 = 目标物理连续角度 - 当前物理连续角度
+            command.pidErrorDeg = targetPhysicalDeg - physicalTurretRelDeg;
         }
 
-        // ================= 【核心新增】内置 PID 闭环控制 =================
+        // ================= 内置 PID 闭环控制 =================
         if (turretMotor != null) {
             if (command.hasTarget) {
                 double error = command.pidErrorDeg;
@@ -233,7 +246,6 @@ public class AutoAimSubsystem {
                 lastError = error;
                 pidTimer.reset();
             } else {
-                // 如果丢失目标，断电清空缓存防止 Windup
                 turretMotor.setPower(0);
                 currentTurretPower = 0;
                 integralSum = 0;
@@ -256,6 +268,7 @@ public class AutoAimSubsystem {
             telemetry.addData("Target Locked", "WorldX:%.0f WorldY:%.0f", targetX, targetY);
             telemetry.addData("Aim Command", "RPM: %.0f | Pitch: %.2f", aim.rpm, aim.pitch);
             telemetry.addData("Turret Control", "Pow: %.2f | Err: %.1f°", currentTurretPower, error);
+            telemetry.addData("Turret Physical Deg", turretMotor.getCurrentPosition() / TICKS_PER_DEGREE);
         } else {
             telemetry.addLine("[Target] LOST or TOO CLOSE");
         }
