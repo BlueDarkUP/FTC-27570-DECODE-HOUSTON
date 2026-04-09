@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.TeleOp;
 
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -43,8 +45,13 @@ public class AutoAimTeleOp extends LinearOpMode {
     // 飞轮与供弹参数
     private final double IDLE_VELOCITY = 1000.0;     // 怠速转速
     private final double VELOCITY_TOLERANCE = 100.0;
-
     private final double kF = 0.0003;
+
+    // ======== 俯仰舵机物理限位 (基于测试得出) ========
+    private final double LP_UP = 1;
+    private final double LP_DOWN = 0.4;
+    private final double RP_UP = 0;
+    private final double RP_DOWN = 0.5;
 
     // ================= 状态变量 =================
     private boolean isShootingMode = false;  // 是否处于发射模式
@@ -52,6 +59,10 @@ public class AutoAimTeleOp extends LinearOpMode {
 
     @Override
     public void runOpMode() {
+        // ========== 新增：将手机和网页端的遥测合并 ==========
+        // 这样不仅能在手机看到数据，还能在浏览器 (192.168.43.1:8080/dash) 实时看图表和调参
+        telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
+
         // --------------------------------------------------
         // 1. 底盘电机初始化
         // --------------------------------------------------
@@ -119,10 +130,7 @@ public class AutoAimTeleOp extends LinearOpMode {
 
             // 俯仰舵机在 Init 阶段也跟随预瞄
             if (aimCommand.hasTarget) {
-                double lpTarget = aimCommand.targetPitch;
-                double rpRaw = 1.0 - lpTarget + 0.1;
-                LP.setPosition(lpTarget);
-                RP.setPosition(Math.max(0.0, Math.min(1.0, rpRaw)));
+                setPitchServos(aimCommand.targetPitch);
             }
 
             telemetry.addLine("Ready to Start - Odometry & Turret are Active!");
@@ -160,12 +168,7 @@ public class AutoAimTeleOp extends LinearOpMode {
             // ==========================================
             // 只要存在目标，就让炮管始终对准目标
             if (aimCommand.hasTarget) {
-                double lpTarget = aimCommand.targetPitch;
-                double rpRaw = 1.0 - lpTarget + 0.1;
-                double rpTarget = Math.max(0.0, Math.min(1.0, rpRaw));
-
-                LP.setPosition(lpTarget);
-                RP.setPosition(rpTarget);
+                setPitchServos(aimCommand.targetPitch);
             }
 
             // ==========================================
@@ -242,7 +245,7 @@ public class AutoAimTeleOp extends LinearOpMode {
             telemetry.addData("当前模式", isShootingMode ? "[ 发射模式 ]" : "[ 怠速模式 ]");
             telemetry.addData("bbb 舵机位置", bbb.getPosition());
             if (aimCommand.hasTarget) {
-                telemetry.addData("Pitch 舵机", "LP: %.2f | RP: %.2f", LP.getPosition(), RP.getPosition());
+                telemetry.addData("Pitch 舵机", "LP: %.3f | RP: %.3f", LP.getPosition(), RP.getPosition());
             }
             telemetry.addData("飞轮当前 RPM", currentVelocity);
             telemetry.addData("飞轮目标 RPM", targetVelocity);
@@ -263,5 +266,29 @@ public class AutoAimTeleOp extends LinearOpMode {
         rf.setPower(0);
         lb.setPower(0);
         rb.setPower(0);
+    }
+
+    /**
+     * 俯仰双舵机线性联动函数
+     * 根据目标 LP 数值，计算出对应的 RP 数值，确保机械臂两侧受力均匀并绝对对齐。
+     * @param targetPitch 目标左侧(LP)舵机数值
+     */
+    private void setPitchServos(double targetPitch) {
+        // 1. 安全保护：将目标值严格限制在最高和最低物理限位之间 (注意 0.13 < 0.615)
+        double clampedLP = Math.max(LP_DOWN, Math.min(LP_UP, targetPitch));
+
+        // 2. 线性插值计算 (Linear Interpolation)
+        // 占比公式：当前位置距离 DOWN 端的百分比
+        double proportion = (clampedLP - LP_DOWN) / (LP_UP - LP_DOWN);
+
+        // 3. 将同样的百分比映射到 RP 舵机上
+        double calculatedRP = RP_DOWN + proportion * (RP_UP - RP_DOWN);
+
+        // 4. 对 RP 进行二次容错限幅 (保护舵机防卡死)
+        calculatedRP = Math.max(0.0, Math.min(1.0, calculatedRP));
+
+        // 5. 下发控制
+        LP.setPosition(clampedLP);
+        RP.setPosition(calculatedRP);
     }
 }

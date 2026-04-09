@@ -29,8 +29,9 @@ public class AutoAimSubsystem {
     public final double TURRET_OFFSET_FWD = -2.0;
     public final double TURRET_OFFSET_LEFT = 0.0;
 
-    public final double TURRET_SOFT_LIMIT = 190.0;
-    public final double TURRET_TICKS_PER_REV = 32000.0;
+    public final double TURRET_SOFT_LIMIT = 250.0;
+    public final double TURRET_START_OFFSET_DEG = 180.0; // 新增：启动时云台相对于车头正前方的角度
+    public final double TURRET_TICKS_PER_REV = 32798;
     public final double TICKS_PER_DEGREE = TURRET_TICKS_PER_REV / 360.0;
 
     public final double STATIONARY_SPEED_LIMIT = 5.0;
@@ -95,7 +96,7 @@ public class AutoAimSubsystem {
         }
 
         try {
-            turretMotor = hardwareMap.get(DcMotorEx.class, "turret");
+            turretMotor = hardwareMap.get(DcMotorEx.class, "Turret");
             turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
             turretMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
             turretMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
@@ -189,7 +190,7 @@ public class AutoAimSubsystem {
                 turretX, turretY, smoothVx, smoothVy, targetX, targetY
         );
 
-        // 新增：计算并记录目标距离
+        // 计算并记录目标距离
         double distanceToTarget = Math.hypot(targetX - turretX, targetY - turretY);
 
         // ================= 【核心修改】6. 软限位与长路径防缠绕解算 =================
@@ -199,37 +200,39 @@ public class AutoAimSubsystem {
             command.targetPitch = aim.pitch;
             command.targetDistance = distanceToTarget; // 赋值距离到指令包
 
-            // 1. 获取物理底盘朝向和目标绝对朝向
+            // 1. 获取目标绝对朝向和底盘绝对朝向
             double targetAbsHeading = aim.algYaw - 90.0;
             double currentChassisHeading = robotPose.getHeading(AngleUnit.DEGREES);
 
-            // 2. 利用新加装的编码器获取【不折叠】的真实物理相对角度
-            // 假设机器人启动时云台居中(0度)。如果是正反转反了，这里加个负号。
-            double physicalTurretRelDeg = turretMotor.getCurrentPosition() / TICKS_PER_DEGREE;
+            // 2. 获取编码器的原生连续角度 (范围大约在 -190 到 190 之间)
+            double encoderDeg = turretMotor.getCurrentPosition() / TICKS_PER_DEGREE;
 
-            // 3. 计算想要到达的理想相对角度（可能会被映射到 -180 到 180）
-            double desiredRelDeg = targetAbsHeading - currentChassisHeading;
+            // 3. 计算当前云台相对于底盘的真实几何朝向 (核心修正：编码器角度 + 初始的180度偏移)
+            double currentTurretRelDegToChassis = encoderDeg + TURRET_START_OFFSET_DEG;
 
-            // 4. 计算从【当前真实位置】到【目标位置】的最短角度误差
-            double shortestPathError = AngleUnit.normalizeDegrees(desiredRelDeg - physicalTurretRelDeg);
+            // 4. 计算想要到达的理想相对底盘角度
+            double desiredRelDegToChassis = targetAbsHeading - currentChassisHeading;
 
-            // 5. 尝试按照最短路径得到的“未来物理位置”
-            double targetPhysicalDeg = physicalTurretRelDeg + shortestPathError;
+            // 5. 计算最短角度误差 (目标几何角度 - 当前几何角度)
+            double shortestPathError = AngleUnit.normalizeDegrees(desiredRelDegToChassis - currentTurretRelDegToChassis);
 
-            // 6. 防缠绕/突破软限位逻辑 (核心修补)
-            // 如果走最短路径会超过软限位，那就必须强制它“走远路绕回去”（减去或加上360度）
-            if (targetPhysicalDeg > TURRET_SOFT_LIMIT) {
-                targetPhysicalDeg -= 360.0;
-            } else if (targetPhysicalDeg < -TURRET_SOFT_LIMIT) {
-                targetPhysicalDeg += 360.0;
+            // 6. 将误差映射回编码器的物理坐标系，得到未来的目标编码器角度
+            double targetEncoderDeg = encoderDeg + shortestPathError;
+
+            // 7. 防缠绕/突破软限位逻辑
+            // 此时 targetEncoderDeg 完全对应软限位坐标系，可以直接与 190 比较
+            if (targetEncoderDeg > TURRET_SOFT_LIMIT) {
+                targetEncoderDeg -= 360.0; // 走远路绕回去
+            } else if (targetEncoderDeg < -TURRET_SOFT_LIMIT) {
+                targetEncoderDeg += 360.0; // 走远路绕回去
             }
 
-            // 7. 死区保护：如果“绕回去”之后依然超出软限位，说明目标完全在物理死区内，强行贴边停住
-            if (targetPhysicalDeg > TURRET_SOFT_LIMIT) targetPhysicalDeg = TURRET_SOFT_LIMIT;
-            if (targetPhysicalDeg < -TURRET_SOFT_LIMIT) targetPhysicalDeg = -TURRET_SOFT_LIMIT;
+            // 8. 死区保护：如果绕回去了依然在死区（比如目标正好在车头正前方狭窄的死区内），强行停在限位处
+            if (targetEncoderDeg > TURRET_SOFT_LIMIT) targetEncoderDeg = TURRET_SOFT_LIMIT;
+            if (targetEncoderDeg < -TURRET_SOFT_LIMIT) targetEncoderDeg = -TURRET_SOFT_LIMIT;
 
-            // 8. 最终送给PID的误差值 = 目标物理连续角度 - 当前物理连续角度
-            command.pidErrorDeg = targetPhysicalDeg - physicalTurretRelDeg;
+            // 9. 最终送给PID的误差值 = 目标编码器角度 - 当前编码器角度
+            command.pidErrorDeg = targetEncoderDeg - encoderDeg;
         }
 
         // ================= 内置 PID 闭环控制 =================
@@ -273,7 +276,11 @@ public class AutoAimSubsystem {
             telemetry.addData("Target Locked", "WorldX:%.0f WorldY:%.0f | Dist: %.1f in", targetX, targetY, command.targetDistance);
             telemetry.addData("Aim Command", "RPM: %.0f | Pitch: %.2f", aim.rpm, aim.pitch);
             telemetry.addData("Turret Control", "Pow: %.2f | Err: %.1f°", currentTurretPower, command.pidErrorDeg);
-            telemetry.addData("Turret Physical Deg", turretMotor.getCurrentPosition() / TICKS_PER_DEGREE);
+
+            // 增加打印编码器物理角度和换算后的底盘相对几何角度，以便于验证
+            double encDeg = turretMotor.getCurrentPosition() / TICKS_PER_DEGREE;
+            telemetry.addData("Turret Angle", "Encoder: %.1f° | RelToFront: %.1f°",
+                    encDeg, AngleUnit.normalizeDegrees(encDeg + TURRET_START_OFFSET_DEG));
         } else {
             telemetry.addLine("[Target] LOST or TOO CLOSE");
         }
