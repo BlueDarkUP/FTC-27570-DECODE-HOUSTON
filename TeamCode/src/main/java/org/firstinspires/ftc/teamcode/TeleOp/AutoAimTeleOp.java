@@ -35,15 +35,18 @@ public class AutoAimTeleOp extends LinearOpMode {
     private AutoAimSubsystem autoAim;
 
     // ================= 常量配置 =================
-    private final double TARGET_X_WORLD = 132.0;
-    private final double TARGET_Y_WORLD = 136.0;
+    private final double TARGET_X_WORLD = 130.0;
+    private final double TARGET_Y_WORLD = 134.0;
 
     private final double IDLE_VELOCITY = 1000.0;
     private final double VELOCITY_TOLERANCE = 100.0;
+
     private final double kF = 0.0003;
+    private final double kP = 0.001;
 
     private final double STALL_CURRENT_AMPS = 2.7;
     private final double STALL_COOLDOWN_SEC = 0.5;
+    private final double STALL_TIME_THRESHOLD_SEC = 0.3;
 
     private final double LP_UP = 1;
     private final double LP_DOWN = 0.4;
@@ -56,7 +59,9 @@ public class AutoAimTeleOp extends LinearOpMode {
 
     private double intakeBrakeReleaseTime = 0.0;
 
-    // 【新增】云台复位保护计时变量
+    private double stallStartTime = 0.0;
+    private boolean isStalling = false;
+
     private double unwindReverseEndTime = 0.0;
     private boolean wasUnwinding = false;
 
@@ -157,7 +162,6 @@ public class AutoAimTeleOp extends LinearOpMode {
                 bbb.setPosition(0);
             }
 
-            // [六] 飞轮控制
             double currentVelocity = motorSH.getVelocity();
             double error = targetVelocity - currentVelocity;
             double power = 0.0;
@@ -167,9 +171,11 @@ public class AutoAimTeleOp extends LinearOpMode {
             } else if (currentVelocity > targetVelocity + VELOCITY_TOLERANCE) {
                 power = 0.0;
             } else {
-                power = targetVelocity * kF;
+                power = (targetVelocity * kF) + (error * kP);
             }
+
             power = Math.max(0.0, Math.min(1.0, power));
+
             motorSH.setPower(power);
             motorHS.setPower(power);
 
@@ -179,23 +185,22 @@ public class AutoAimTeleOp extends LinearOpMode {
             double intakeCurrent = motorIntake.getCurrent(CurrentUnit.AMPS);
 
             if (isShootingMode) {
+                isStalling = false;
 
-                // 【新增逻辑】判断云台是否正在因为触碰软限位而大角度掉头复位
                 if (aimCommand.hasTarget && aimCommand.isUnwinding) {
 
-                    // 边缘检测：记录开始掉头的时刻，给定 0.2秒反转时间
                     if (!wasUnwinding) {
                         unwindReverseEndTime = getRuntime() + 0.2;
                     }
 
                     if (getRuntime() < unwindReverseEndTime) {
-                        motorIntake.setPower(-1.0); // 强制反转退弹 0.2秒
+                        motorIntake.setPower(-1.0);
                         telemetry.addData("🔴 发射系统", "⚠️ 云台复位中: Intake 反转退弹!");
                     } else {
-                        motorIntake.setPower(0.0);  // 退弹完毕，强制刹车防误射
+                        motorIntake.setPower(0.0);
                         telemetry.addData("🔴 发射系统", "⚠️ 云台复位中: Intake 刹车等待");
                     }
-                    intakeBrakeReleaseTime = 0.0; // 清理原有堵转时间防止幽灵干涉
+                    intakeBrakeReleaseTime = 0.0;
 
                 } else {
                     // 正常发射逻辑
@@ -209,20 +214,30 @@ public class AutoAimTeleOp extends LinearOpMode {
                 }
 
             } else {
-                // 怠速模式堵转保护
+                // 【修改逻辑】怠速模式堵转保护 - 增加持续时间确认，过滤启动突变电流
                 if (intakeCurrent >= STALL_CURRENT_AMPS) {
-                    intakeBrakeReleaseTime = getRuntime() + STALL_COOLDOWN_SEC;
+                    if (!isStalling) {
+                        isStalling = true;
+                        stallStartTime = getRuntime();
+                    } else if (getRuntime() - stallStartTime >= STALL_TIME_THRESHOLD_SEC) {
+                        intakeBrakeReleaseTime = getRuntime() + STALL_COOLDOWN_SEC;
+                    }
+                } else {
+                    isStalling = false;
                 }
+
+                // 执行逻辑
                 if (getRuntime() < intakeBrakeReleaseTime) {
                     motorIntake.setPower(0.0);
                     telemetry.addData("🟢 发射系统", "⚠️ INTAKE堵转保护触发！(刹车冷却中)");
+                    // 刹车冷却期间重置检测器，防止冷却一结束又瞬间判定为堵转
+                    isStalling = false;
                 } else {
                     motorIntake.setPower(0.8);
                     telemetry.addData("🟢 发射系统", "怠速中 (Intake 常转收件)");
                 }
             }
 
-            // 【新增】更新掉头状态，供下一轮做边缘检测
             wasUnwinding = aimCommand.isUnwinding;
 
             // [八] 遥测输出
@@ -236,6 +251,13 @@ public class AutoAimTeleOp extends LinearOpMode {
             telemetry.addData("RPM 误差", error);
             telemetry.addData("当前飞轮动力分配", "%.2f", power);
             telemetry.addData("Intake 电流 (A)", "%.2f", intakeCurrent);
+
+            // 方便调试用的防抖状态监控
+            if (!isShootingMode && isStalling && getRuntime() >= intakeBrakeReleaseTime) {
+                telemetry.addData("⚠️ 堵转警告", "高电流持续中: %.2f / %.2f 秒",
+                        (getRuntime() - stallStartTime), STALL_TIME_THRESHOLD_SEC);
+            }
+
             telemetry.update();
         }
 

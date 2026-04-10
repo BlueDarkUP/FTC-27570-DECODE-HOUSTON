@@ -40,12 +40,12 @@ public class AutoAimSubsystem {
     public final double ALPHA_NORMAL = 0.80;
     public final double ALPHA_IMPACT = 0.05;
 
-    public final double LL_FILTER_WEIGHT = 0.08;
+    public final double LL_FILTER_WEIGHT = 0.1;
     public final double LL_MAX_TRUST_DISTANCE = 90.0;
 
-    private final double kP = 0.035;
-    private final double kI = 0.000;
-    private final double kD = 0.00145;
+    private final double kP = 0.055;
+    private final double kI = 0.0022;
+    private final double kD = 0.00075;
 
     private long lastLoopTime = 0;
     private double lastRawVxField = 0;
