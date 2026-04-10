@@ -27,7 +27,9 @@ public class AutoAimSubsystem {
     public final double TURRET_OFFSET_FWD = -2.0;
     public final double TURRET_OFFSET_LEFT = 0.0;
 
-    public final double TURRET_SOFT_LIMIT = 180;
+    public final double TURRET_SOFT_LIMIT_CCW = 175.0;
+    public final double TURRET_SOFT_LIMIT_CW = -210.0;
+
     public final double TURRET_START_OFFSET_DEG = 0;
     public final double TURRET_TICKS_PER_REV = 32798;
     public final double TICKS_PER_DEGREE = TURRET_TICKS_PER_REV / 360.0;
@@ -66,21 +68,17 @@ public class AutoAimSubsystem {
         public double targetRpm = 0;
         public double targetPitch = 0;
         public double targetDistance = 0;
+        public boolean isUnwinding = false; // 【新增】标记云台是否正在大角度掉头/复位
     }
 
-    /**
-     * 构造函数：初始化所有硬件
-     */
     public AutoAimSubsystem(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
-
         try {
             robotPose = new PinpointPoseProvider(hardwareMap, "odo");
             robotPose.initialize();
         } catch (Exception e) {
             telemetry.addLine("[FATAL] Chassis ODO missing.");
         }
-
         try {
             ll = hardwareMap.get(Limelight3A.class, "limelight");
             ll.pipelineSwitch(0);
@@ -88,14 +86,12 @@ public class AutoAimSubsystem {
         } catch (Exception e) {
             telemetry.addLine("[WARN] Limelight Missing.");
         }
-
         try {
             turretPose = new PinpointPoseProvider(hardwareMap, "turretyaw");
             turretPose.initialize();
         } catch (Exception e) {
             telemetry.addLine("[WARN] Turret hardware missing. Virtual Turret Mode Active.");
         }
-
         try {
             turretMotor = hardwareMap.get(DcMotorEx.class, "Turret");
             turretMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -104,7 +100,6 @@ public class AutoAimSubsystem {
         } catch (Exception e) {
             telemetry.addLine("[FATAL] Turret Motor missing.");
         }
-
         pidTimer.reset();
     }
 
@@ -147,7 +142,7 @@ public class AutoAimSubsystem {
                         targetWorldY_Inches + (rVy * latency),
                         AngleUnit.RADIANS, mappedHeading_Rad);
 
-                double currentOdoX = robotPose.getX(DistanceUnit.INCH);
+                double currentOdoX = -robotPose.getX(DistanceUnit.INCH);
                 double currentOdoY = robotPose.getY(DistanceUnit.INCH);
                 double currentOdoH = robotPose.getHeading(AngleUnit.RADIANS);
 
@@ -224,16 +219,19 @@ public class AutoAimSubsystem {
 
             double targetEncoderDeg = encoderDeg + shortestPathError;
 
-            if (targetEncoderDeg > TURRET_SOFT_LIMIT) {
+            if (targetEncoderDeg > TURRET_SOFT_LIMIT_CCW) {
                 targetEncoderDeg -= 360.0;
-            } else if (targetEncoderDeg < -TURRET_SOFT_LIMIT) {
+            } else if (targetEncoderDeg < TURRET_SOFT_LIMIT_CW) {
                 targetEncoderDeg += 360.0;
             }
 
-            if (targetEncoderDeg > TURRET_SOFT_LIMIT) targetEncoderDeg = TURRET_SOFT_LIMIT;
-            if (targetEncoderDeg < -TURRET_SOFT_LIMIT) targetEncoderDeg = -TURRET_SOFT_LIMIT;
+            if (targetEncoderDeg > TURRET_SOFT_LIMIT_CCW) targetEncoderDeg = TURRET_SOFT_LIMIT_CCW;
+            if (targetEncoderDeg < TURRET_SOFT_LIMIT_CW) targetEncoderDeg = TURRET_SOFT_LIMIT_CW;
 
             command.pidErrorDeg = targetEncoderDeg - encoderDeg;
+
+            // 【新增】：当目标误差超过 45 度时，判定为正在进行大角度复位或掉头
+            command.isUnwinding = Math.abs(command.pidErrorDeg) > 45.0;
         }
 
         if (turretMotor != null) {
@@ -275,9 +273,12 @@ public class AutoAimSubsystem {
         if(aim != null && command.hasTarget) {
             telemetry.addData("Target Locked", "WorldX:%.0f WorldY:%.0f | Dist: %.1f in", targetX, targetY, command.targetDistance);
             telemetry.addData("Aim Command", "RPM: %.0f | Pitch: %.2f", aim.rpm, aim.pitch);
-            telemetry.addData("Turret Control", "Pow: %.2f | Err: %.1f°", currentTurretPower, command.pidErrorDeg);
 
             double encDeg = turretMotor.getCurrentPosition() / TICKS_PER_DEGREE;
+
+            telemetry.addData("Turret Control", "Pow: %.2f | Err: %.1f° | Tgt: %.1f°",
+                    currentTurretPower, command.pidErrorDeg, (encDeg + command.pidErrorDeg));
+
             telemetry.addData("Turret Angle", "Encoder: %.1f° | RelToFront: %.1f°",
                     encDeg, AngleUnit.normalizeDegrees(encDeg + TURRET_START_OFFSET_DEG));
         } else {
