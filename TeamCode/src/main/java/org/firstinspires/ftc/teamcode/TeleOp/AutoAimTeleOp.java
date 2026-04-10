@@ -10,6 +10,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit; // 【新增】导入电流单位
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.teamcode.AutoAim.AutoAimSubsystem;
@@ -27,7 +28,7 @@ public class AutoAimTeleOp extends LinearOpMode {
     // 射击与供弹电机
     private DcMotorEx motorSH;
     private DcMotorEx motorHS;
-    private DcMotor motorIntake;
+    private DcMotorEx motorIntake;
 
     // 状态与瞄准舵机
     private Servo bbb; // 模式切换指示/联动舵机
@@ -47,6 +48,9 @@ public class AutoAimTeleOp extends LinearOpMode {
     private final double VELOCITY_TOLERANCE = 100.0;
     private final double kF = 0.0003;
 
+    private final double STALL_CURRENT_AMPS = 4.0;   // 堵转判定电流阈值
+    private final double STALL_COOLDOWN_SEC = 0.5;   // 触发保护后的停机冷却时间（防止高频抽搐）
+
     // ======== 俯仰舵机物理限位 (基于测试得出) ========
     private final double LP_UP = 1;
     private final double LP_DOWN = 0.4;
@@ -57,10 +61,11 @@ public class AutoAimTeleOp extends LinearOpMode {
     private boolean isShootingMode = false;  // 是否处于发射模式
     private boolean lastCircleState = false; // 记录上一次按键状态（用于Toggle边缘检测）
 
+    private double intakeBrakeReleaseTime = 0.0;
+
     @Override
     public void runOpMode() {
         // ========== 新增：将手机和网页端的遥测合并 ==========
-        // 这样不仅能在手机看到数据，还能在浏览器 (192.168.43.1:8080/dash) 实时看图表和调参
         telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
 
         // --------------------------------------------------
@@ -86,7 +91,8 @@ public class AutoAimTeleOp extends LinearOpMode {
         // --------------------------------------------------
         motorSH = hardwareMap.get(DcMotorEx.class, "SH");
         motorHS = hardwareMap.get(DcMotorEx.class, "HS");
-        motorIntake = hardwareMap.get(DcMotor.class, "Intake");
+        motorIntake = hardwareMap.get(DcMotorEx.class, "Intake"); // 【修改】实例化为 DcMotorEx
+
         bbb = hardwareMap.get(Servo.class, "bbb");
         LP = hardwareMap.get(Servo.class, "LP");
         RP = hardwareMap.get(Servo.class, "RP");
@@ -125,19 +131,14 @@ public class AutoAimTeleOp extends LinearOpMode {
         // 4. Init 循环（比赛开始前的预热预瞄阶段）
         // --------------------------------------------------
         while (opModeInInit()) {
-            // 在点击 Start 前，持续更新 Odom 并让云台自动瞄准目标
             AutoAimSubsystem.TurretCommand aimCommand = autoAim.update(TARGET_X_WORLD, TARGET_Y_WORLD);
-
-            // 俯仰舵机在 Init 阶段也跟随预瞄
             if (aimCommand.hasTarget) {
                 setPitchServos(aimCommand.targetPitch);
             }
-
             telemetry.addLine("Ready to Start - Odometry & Turret are Active!");
             telemetry.update();
         }
 
-        // 比赛正式开始（按下 Start 键后执行到此处）
 
         // --------------------------------------------------
         // 5. 主循环 (TeleOp阶段)
@@ -160,13 +161,11 @@ public class AutoAimTeleOp extends LinearOpMode {
             // ==========================================
             // [二] 自瞄系统后台更新
             // ==========================================
-            // 无论何种模式，自瞄系统持续解算云台偏航和弹道俯仰
             AutoAimSubsystem.TurretCommand aimCommand = autoAim.update(TARGET_X_WORLD, TARGET_Y_WORLD);
 
             // ==========================================
             // [三] 俯仰双舵机实时控制 (Pitch)
             // ==========================================
-            // 只要存在目标，就让炮管始终对准目标
             if (aimCommand.hasTarget) {
                 setPitchServos(aimCommand.targetPitch);
             }
@@ -183,20 +182,16 @@ public class AutoAimTeleOp extends LinearOpMode {
             // ==========================================
             // [五] 飞轮目标转速与 bbb 舵机位置分配
             // ==========================================
-            double targetVelocity = IDLE_VELOCITY; // 默认怠速
+            double targetVelocity = IDLE_VELOCITY;
 
             if (isShootingMode) {
-                // 处于发射模式：bbb 舵机立刻打到 0.0
                 bbb.setPosition(0.0);
-
                 if (aimCommand.hasTarget) {
-                    targetVelocity = aimCommand.targetRpm; // 如果有目标，使用自瞄解算的 RPM
+                    targetVelocity = aimCommand.targetRpm;
                 } else {
-                    // 发射模式下但丢失目标，安全起见保持怠速
                     targetVelocity = IDLE_VELOCITY;
                 }
             } else {
-                // 不处于发射模式（怠速）：bbb 舵机复位到 1.0
                 bbb.setPosition(1.0);
             }
 
@@ -209,11 +204,9 @@ public class AutoAimTeleOp extends LinearOpMode {
 
             if (currentVelocity < targetVelocity - VELOCITY_TOLERANCE) {
                 power = 1.0;
-            }
-            else if (currentVelocity > targetVelocity + VELOCITY_TOLERANCE) {
+            } else if (currentVelocity > targetVelocity + VELOCITY_TOLERANCE) {
                 power = 0.0;
-            }
-            else {
+            } else {
                 power = targetVelocity * kF;
             }
             power = Math.max(0.0, Math.min(1.0, power));
@@ -222,8 +215,11 @@ public class AutoAimTeleOp extends LinearOpMode {
             motorHS.setPower(power);
 
             // ==========================================
-            // [七] 智能 Intake (供弹) 逻辑
+            // [七] 智能 Intake (供弹与堵转保护) 逻辑
             // ==========================================
+            // 【新增】实时获取 Intake 电机的电流
+            double intakeCurrent = motorIntake.getCurrent(CurrentUnit.AMPS);
+
             if (isShootingMode) {
                 // 发射模式：严格受转速误差控制
                 if (Math.abs(error) <= VELOCITY_TOLERANCE && aimCommand.hasTarget) {
@@ -233,10 +229,27 @@ public class AutoAimTeleOp extends LinearOpMode {
                     motorIntake.setPower(0.0); // 掉速、加速或滑行降速中，强制停止喂件防卡弹
                     telemetry.addData("🔴 发射系统", "预热/调速中...");
                 }
+
+                // 进入发射模式时，重置堵转定时器，防止切回怠速后处于幽灵保护状态
+                intakeBrakeReleaseTime = 0.0;
+
             } else {
-                // 怠速模式：只要不发射，Intake 始终保持 0.8 的动力运转收件
-                motorIntake.setPower(0.8);
-                telemetry.addData("🟢 发射系统", "怠速中 (Intake 常转收件)");
+                // 怠速模式：只要不发射，Intake 始终保持运转，同时包含【堵转保护】
+
+                // 检测是否达到堵转电流阈值（≥4A）
+                if (intakeCurrent >= STALL_CURRENT_AMPS) {
+                    // 刷新停机倒计时，要求往后至少停转 0.5秒
+                    intakeBrakeReleaseTime = getRuntime() + STALL_COOLDOWN_SEC;
+                }
+
+                // 判断是否处于保护冷却期内
+                if (getRuntime() < intakeBrakeReleaseTime) {
+                    motorIntake.setPower(0.0); // 立刻刹车
+                    telemetry.addData("🟢 发射系统", "⚠️ INTAKE堵转保护触发！(刹车冷却中)");
+                } else {
+                    motorIntake.setPower(0.8); // 正常收件
+                    telemetry.addData("🟢 发射系统", "怠速中 (Intake 常转收件)");
+                }
             }
 
             // ==========================================
@@ -250,9 +263,11 @@ public class AutoAimTeleOp extends LinearOpMode {
             telemetry.addData("飞轮当前 RPM", currentVelocity);
             telemetry.addData("飞轮目标 RPM", targetVelocity);
             telemetry.addData("RPM 误差", error);
-            telemetry.addData("当前飞轮动力分配", "%.2f", power); // 监控 Bang-Bang 当前所处状态 (1.0 / 0.0 / kF)
+            telemetry.addData("当前飞轮动力分配", "%.2f", power);
 
-            // autoAim 内部的遥测已经通过 update() 传入，只需统一下发
+            // 【新增】监控 Intake 电流
+            telemetry.addData("Intake 电流 (A)", "%.2f", intakeCurrent);
+
             telemetry.update();
         }
 
@@ -268,26 +283,12 @@ public class AutoAimTeleOp extends LinearOpMode {
         rb.setPower(0);
     }
 
-    /**
-     * 俯仰双舵机线性联动函数
-     * 根据目标 LP 数值，计算出对应的 RP 数值，确保机械臂两侧受力均匀并绝对对齐。
-     * @param targetPitch 目标左侧(LP)舵机数值
-     */
     private void setPitchServos(double targetPitch) {
-        // 1. 安全保护：将目标值严格限制在最高和最低物理限位之间 (注意 0.13 < 0.615)
         double clampedLP = Math.max(LP_DOWN, Math.min(LP_UP, targetPitch));
-
-        // 2. 线性插值计算 (Linear Interpolation)
-        // 占比公式：当前位置距离 DOWN 端的百分比
         double proportion = (clampedLP - LP_DOWN) / (LP_UP - LP_DOWN);
-
-        // 3. 将同样的百分比映射到 RP 舵机上
         double calculatedRP = RP_DOWN + proportion * (RP_UP - RP_DOWN);
-
-        // 4. 对 RP 进行二次容错限幅 (保护舵机防卡死)
         calculatedRP = Math.max(0.0, Math.min(1.0, calculatedRP));
 
-        // 5. 下发控制
         LP.setPosition(clampedLP);
         RP.setPosition(calculatedRP);
     }

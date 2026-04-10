@@ -16,21 +16,19 @@ import org.firstinspires.ftc.teamcode.Driver.EchoLapse.PinpointPoseProvider;
 
 public class AutoAimSubsystem {
 
-    // ================= 硬件声明 =================
     private PinpointPoseProvider robotPose;
     private PinpointPoseProvider turretPose;
     private Limelight3A ll;
     private Telemetry telemetry;
     private DcMotorEx turretMotor;
 
-    // ================= 常量配置 =================
     public final double FIELD_OFFSET_X = 72.0;
     public final double FIELD_OFFSET_Y = 72.0;
     public final double TURRET_OFFSET_FWD = -2.0;
     public final double TURRET_OFFSET_LEFT = 0.0;
 
-    public final double TURRET_SOFT_LIMIT = 250.0;
-    public final double TURRET_START_OFFSET_DEG = 180.0; // 新增：启动时云台相对于车头正前方的角度
+    public final double TURRET_SOFT_LIMIT = 180;
+    public final double TURRET_START_OFFSET_DEG = 0;
     public final double TURRET_TICKS_PER_REV = 32798;
     public final double TICKS_PER_DEGREE = TURRET_TICKS_PER_REV / 360.0;
 
@@ -40,11 +38,13 @@ public class AutoAimSubsystem {
     public final double ALPHA_NORMAL = 0.80;
     public final double ALPHA_IMPACT = 0.05;
 
+    public final double LL_FILTER_WEIGHT = 0.08;
+    public final double LL_MAX_TRUST_DISTANCE = 90.0;
+
     private final double kP = 0.035;
     private final double kI = 0.000;
     private final double kD = 0.00145;
 
-    // ================= 状态变量 =================
     private long lastLoopTime = 0;
     private double lastRawVxField = 0;
     private double lastRawVyField = 0;
@@ -58,13 +58,14 @@ public class AutoAimSubsystem {
     private ElapsedTime pidTimer = new ElapsedTime();
     private double currentTurretPower = 0;
 
-    // ================= 返回值数据结构 =================
+    private boolean isLLActiveThisLoop = false;
+
     public static class TurretCommand {
         public boolean hasTarget = false;
         public double pidErrorDeg = 0;
         public double targetRpm = 0;
         public double targetPitch = 0;
-        public double targetDistance = 0; // 新增：距离目标的绝对直线距离(英寸)
+        public double targetDistance = 0;
     }
 
     /**
@@ -113,7 +114,6 @@ public class AutoAimSubsystem {
 
         if (lastLoopTime == 0) lastLoopTime = System.nanoTime();
 
-        // 1. 读取位置传感器
         robotPose.update();
         if (turretPose != null) turretPose.update();
 
@@ -125,10 +125,12 @@ public class AutoAimSubsystem {
         double rOmega = robotPose.getHeadingVelocity(AngleUnit.RADIANS);
         double speed = Math.hypot(rVx, rVy);
 
-        // 2. 视觉辅助定位融合
+        double chassisDistToTarget = Math.hypot(targetX - rX, targetY - rY);
+
+        isLLActiveThisLoop = false;
         if (ll != null) {
             LLResult result = ll.getLatestResult();
-            if (result != null && result.isValid() && speed < STATIONARY_SPEED_LIMIT) {
+            if (result != null && result.isValid() && speed < STATIONARY_SPEED_LIMIT && chassisDistToTarget < LL_MAX_TRUST_DISTANCE) {
                 Pose3D botpose = result.getBotpose();
                 double llRawX_Meters = botpose.getPosition().x;
                 double llRawY_Meters = botpose.getPosition().y;
@@ -139,12 +141,24 @@ public class AutoAimSubsystem {
                 double mappedHeading_Rad = AngleUnit.normalizeRadians(llRawYaw_Rad + Math.PI);
 
                 double latency = (result.getCaptureLatency() + result.getTargetingLatency()) / 1000.0;
-                Pose2D correctedPose = new Pose2D(DistanceUnit.INCH,
+
+                Pose2D targetLLPose = new Pose2D(DistanceUnit.INCH,
                         targetWorldX_Inches + (rVx * latency),
                         targetWorldY_Inches + (rVy * latency),
                         AngleUnit.RADIANS, mappedHeading_Rad);
 
-                robotPose.setPose(correctedPose);
+                double currentOdoX = robotPose.getX(DistanceUnit.INCH);
+                double currentOdoY = robotPose.getY(DistanceUnit.INCH);
+                double currentOdoH = robotPose.getHeading(AngleUnit.RADIANS);
+
+                double newX = currentOdoX + (targetLLPose.getX(DistanceUnit.INCH) - currentOdoX) * LL_FILTER_WEIGHT;
+                double newY = currentOdoY + (targetLLPose.getY(DistanceUnit.INCH) - currentOdoY) * LL_FILTER_WEIGHT;
+
+                double angleDiff = AngleUnit.normalizeRadians(targetLLPose.getHeading(AngleUnit.RADIANS) - currentOdoH);
+                double newH = AngleUnit.normalizeRadians(currentOdoH + (angleDiff * LL_FILTER_WEIGHT));
+
+                robotPose.setPose(new Pose2D(DistanceUnit.INCH, newX, newY, AngleUnit.RADIANS, newH));
+                isLLActiveThisLoop = true;
             }
         }
 
@@ -185,57 +199,43 @@ public class AutoAimSubsystem {
         lastSmoothVyField = smoothVy;
         lastLoopTime = System.nanoTime();
 
-        // 5. 弹道解算
         AimCalculator.AimResult aim = AimCalculator.solveAim(
                 turretX, turretY, smoothVx, smoothVy, targetX, targetY
         );
 
-        // 计算并记录目标距离
         double distanceToTarget = Math.hypot(targetX - turretX, targetY - turretY);
 
-        // ================= 【核心修改】6. 软限位与长路径防缠绕解算 =================
         if (aim != null && turretMotor != null) {
             command.hasTarget = true;
             command.targetRpm = aim.rpm;
             command.targetPitch = aim.pitch;
-            command.targetDistance = distanceToTarget; // 赋值距离到指令包
+            command.targetDistance = distanceToTarget;
 
-            // 1. 获取目标绝对朝向和底盘绝对朝向
             double targetAbsHeading = aim.algYaw - 90.0;
             double currentChassisHeading = robotPose.getHeading(AngleUnit.DEGREES);
 
-            // 2. 获取编码器的原生连续角度 (范围大约在 -190 到 190 之间)
             double encoderDeg = turretMotor.getCurrentPosition() / TICKS_PER_DEGREE;
 
-            // 3. 计算当前云台相对于底盘的真实几何朝向 (核心修正：编码器角度 + 初始的180度偏移)
             double currentTurretRelDegToChassis = encoderDeg + TURRET_START_OFFSET_DEG;
 
-            // 4. 计算想要到达的理想相对底盘角度
             double desiredRelDegToChassis = targetAbsHeading - currentChassisHeading;
 
-            // 5. 计算最短角度误差 (目标几何角度 - 当前几何角度)
             double shortestPathError = AngleUnit.normalizeDegrees(desiredRelDegToChassis - currentTurretRelDegToChassis);
 
-            // 6. 将误差映射回编码器的物理坐标系，得到未来的目标编码器角度
             double targetEncoderDeg = encoderDeg + shortestPathError;
 
-            // 7. 防缠绕/突破软限位逻辑
-            // 此时 targetEncoderDeg 完全对应软限位坐标系，可以直接与 190 比较
             if (targetEncoderDeg > TURRET_SOFT_LIMIT) {
-                targetEncoderDeg -= 360.0; // 走远路绕回去
+                targetEncoderDeg -= 360.0;
             } else if (targetEncoderDeg < -TURRET_SOFT_LIMIT) {
-                targetEncoderDeg += 360.0; // 走远路绕回去
+                targetEncoderDeg += 360.0;
             }
 
-            // 8. 死区保护：如果绕回去了依然在死区（比如目标正好在车头正前方狭窄的死区内），强行停在限位处
             if (targetEncoderDeg > TURRET_SOFT_LIMIT) targetEncoderDeg = TURRET_SOFT_LIMIT;
             if (targetEncoderDeg < -TURRET_SOFT_LIMIT) targetEncoderDeg = -TURRET_SOFT_LIMIT;
 
-            // 9. 最终送给PID的误差值 = 目标编码器角度 - 当前编码器角度
             command.pidErrorDeg = targetEncoderDeg - encoderDeg;
         }
 
-        // ================= 内置 PID 闭环控制 =================
         if (turretMotor != null) {
             if (command.hasTarget) {
                 double error = command.pidErrorDeg;
@@ -246,7 +246,7 @@ public class AutoAimSubsystem {
                 double derivative = (error - lastError) / dt;
 
                 double power = (kP * error) + (kI * integralSum) + (kD * derivative);
-                power = Math.max(-1.0, Math.min(1.0, power)); // 限制在 [-1, 1] 之间
+                power = Math.max(-1.0, Math.min(1.0, power));
 
                 turretMotor.setPower(power);
                 currentTurretPower = power;
@@ -261,9 +261,7 @@ public class AutoAimSubsystem {
                 pidTimer.reset();
             }
         }
-        // =============================================================
 
-        // 7. 自动打印调试信息 (修改签名，传入包含距离信息的 command)
         printTelemetry(aim, command, rX, rY, targetX, targetY);
 
         return command;
@@ -272,12 +270,13 @@ public class AutoAimSubsystem {
     private void printTelemetry(AimCalculator.AimResult aim, TurretCommand command, double rX, double rY, double targetX, double targetY) {
         telemetry.addData("AutoAim Status", isImpactDetected ? "[! IMPACT !]" : "[ OK ]");
         telemetry.addData("Chassis Pos", "X:%.1f  Y:%.1f", rX, rY);
+        telemetry.addData("Vision Filter", isLLActiveThisLoop ? "ACTIVE (Smoothing Drift)" : "DISABLED (Too far/Moving)");
+
         if(aim != null && command.hasTarget) {
             telemetry.addData("Target Locked", "WorldX:%.0f WorldY:%.0f | Dist: %.1f in", targetX, targetY, command.targetDistance);
             telemetry.addData("Aim Command", "RPM: %.0f | Pitch: %.2f", aim.rpm, aim.pitch);
             telemetry.addData("Turret Control", "Pow: %.2f | Err: %.1f°", currentTurretPower, command.pidErrorDeg);
 
-            // 增加打印编码器物理角度和换算后的底盘相对几何角度，以便于验证
             double encDeg = turretMotor.getCurrentPosition() / TICKS_PER_DEGREE;
             telemetry.addData("Turret Angle", "Encoder: %.1f° | RelToFront: %.1f°",
                     encDeg, AngleUnit.normalizeDegrees(encDeg + TURRET_START_OFFSET_DEG));
