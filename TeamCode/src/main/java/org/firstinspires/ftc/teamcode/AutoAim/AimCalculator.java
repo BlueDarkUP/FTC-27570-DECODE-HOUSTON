@@ -12,25 +12,25 @@ public class AimCalculator {
 
     // 数据点 1：近战
     public static double P1_DIST = 21.0;
-    public static double P1_RPM = 1550.0;
-    public static double P1_PITCH = 0.4;
+    public static double P1_RPM = 3000;
+    public static double P1_PITCH = 0.35;
     public static double P1_TIME = 0.15;
 
     // 数据点 2：中近
     public static double P2_DIST = 60.0;
-    public static double P2_RPM = 1600.0;
-    public static double P2_PITCH = 0.5;
+    public static double P2_RPM = 3550;
+    public static double P2_PITCH = 0.7;
     public static double P2_TIME = 0.35;
 
     // 数据点 3：中远
     public static double P3_DIST = 89.2;
-    public static double P3_RPM = 1800.0;
-    public static double P3_PITCH = 0.75;
+    public static double P3_RPM = 4100;
+    public static double P3_PITCH = 1;
     public static double P3_TIME = 0.55;
 
     // 数据点 4：最远
     public static double P4_DIST = 150.0;
-    public static double P4_RPM = 2500.0;
+    public static double P4_RPM = 5100;
     public static double P4_PITCH = 1;
     public static double P4_TIME = 0.90;
 

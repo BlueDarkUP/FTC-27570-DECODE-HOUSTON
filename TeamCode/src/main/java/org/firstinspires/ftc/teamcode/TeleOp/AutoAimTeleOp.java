@@ -8,6 +8,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.util.ElapsedTime; // 新增 ElapsedTime 导入
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
@@ -35,16 +36,19 @@ public class AutoAimTeleOp extends LinearOpMode {
     private AutoAimSubsystem autoAim;
 
     // ================= 常量配置 =================
-    private final double TARGET_X_WORLD = 130.0;
+    private final double TARGET_X_WORLD = 133.0;
     private final double TARGET_Y_WORLD = 134.0;
 
     private final double IDLE_VELOCITY = 1000.0;
-    private final double VELOCITY_TOLERANCE = 100.0;
+    private final double VELOCITY_TOLERANCE = 200.0; // 容差b (RPM)
 
-    private final double kF = 0.0003;
-    private final double kP = 0.001;
+    private final double kP = 0.011;
+    private final double kI = 0.0004;
+    private final double kD = 0.00000023;
+    private final double kF = 0.0;
+    private final double TICKS_PER_REV = 28.0;
 
-    private final double STALL_CURRENT_AMPS = 2.7;
+    private final double STALL_CURRENT_AMPS = 2.5;
     private final double STALL_COOLDOWN_SEC = 0.5;
     private final double STALL_TIME_THRESHOLD_SEC = 0.3;
 
@@ -64,6 +68,10 @@ public class AutoAimTeleOp extends LinearOpMode {
 
     private double unwindReverseEndTime = 0.0;
     private boolean wasUnwinding = false;
+
+    private ElapsedTime timer = new ElapsedTime();
+    private double lastErrorTPS = 0;
+    private double integralSum = 0;
 
     @Override
     public void runOpMode() {
@@ -124,6 +132,8 @@ public class AutoAimTeleOp extends LinearOpMode {
             telemetry.update();
         }
 
+        timer.reset();
+
         while (opModeIsActive()) {
 
             // [一] 底盘控制
@@ -152,26 +162,45 @@ public class AutoAimTeleOp extends LinearOpMode {
             lastCircleState = currentCircleState;
 
             // [五] 目标分配
-            double targetVelocity = IDLE_VELOCITY;
+            double targetVelocityRPM = IDLE_VELOCITY;
             if (isShootingMode) {
                 bbb.setPosition(0.18);
                 if (aimCommand.hasTarget) {
-                    targetVelocity = aimCommand.targetRpm;
+                    targetVelocityRPM = aimCommand.targetRpm;
                 }
             } else {
                 bbb.setPosition(0);
             }
 
-            double currentVelocity = motorSH.getVelocity();
-            double error = targetVelocity - currentVelocity;
-            double power = 0.0;
+            double currentVelTPS = motorSH.getVelocity();
+            double targetVelTPS = (targetVelocityRPM * TICKS_PER_REV) / 60.0;
 
-            if (currentVelocity < targetVelocity - VELOCITY_TOLERANCE) {
-                power = 1.0;
-            } else if (currentVelocity > targetVelocity + VELOCITY_TOLERANCE) {
-                power = 0.0;
+            double dt = timer.seconds();
+            timer.reset();
+            if (dt == 0) dt = 1e-9;
+
+            double errorTPS = targetVelTPS - currentVelTPS;
+
+            if (targetVelocityRPM > 100) {
+                integralSum += errorTPS * dt;
             } else {
-                power = (targetVelocity * kF) + (error * kP);
+                integralSum = 0;
+            }
+
+            double maxIntegral = 0.25;
+            if (kI != 0) {
+                if (integralSum > maxIntegral / kI) integralSum = maxIntegral / kI;
+                if (integralSum < -maxIntegral / kI) integralSum = -maxIntegral / kI;
+            }
+
+            double derivative = (errorTPS - lastErrorTPS) / dt;
+            lastErrorTPS = errorTPS;
+
+            double power = (kF * targetVelTPS) + (kP * errorTPS) + (kI * integralSum) + (kD * derivative);
+
+            if (targetVelocityRPM <= 0) {
+                power = 0;
+                integralSum = 0;
             }
 
             power = Math.max(0.0, Math.min(1.0, power));
@@ -179,9 +208,9 @@ public class AutoAimTeleOp extends LinearOpMode {
             motorSH.setPower(power);
             motorHS.setPower(power);
 
-            // ==========================================
-            // [七] 智能 Intake 与云台防误甩保护逻辑
-            // ==========================================
+            double currentRPM = (currentVelTPS * 60.0) / TICKS_PER_REV;
+            double errorRPM = targetVelocityRPM - currentRPM;
+
             double intakeCurrent = motorIntake.getCurrent(CurrentUnit.AMPS);
 
             if (isShootingMode) {
@@ -203,8 +232,7 @@ public class AutoAimTeleOp extends LinearOpMode {
                     intakeBrakeReleaseTime = 0.0;
 
                 } else {
-                    // 正常发射逻辑
-                    if (Math.abs(error) <= VELOCITY_TOLERANCE && aimCommand.hasTarget) {
+                    if (Math.abs(errorRPM) <= VELOCITY_TOLERANCE && aimCommand.hasTarget) {
                         motorIntake.setPower(1.0);
                         telemetry.addData("🔴 发射系统", "开火中 (FIRE!)");
                     } else {
@@ -214,7 +242,6 @@ public class AutoAimTeleOp extends LinearOpMode {
                 }
 
             } else {
-                // 【修改逻辑】怠速模式堵转保护 - 增加持续时间确认，过滤启动突变电流
                 if (intakeCurrent >= STALL_CURRENT_AMPS) {
                     if (!isStalling) {
                         isStalling = true;
@@ -230,7 +257,6 @@ public class AutoAimTeleOp extends LinearOpMode {
                 if (getRuntime() < intakeBrakeReleaseTime) {
                     motorIntake.setPower(0.0);
                     telemetry.addData("🟢 发射系统", "⚠️ INTAKE堵转保护触发！(刹车冷却中)");
-                    // 刹车冷却期间重置检测器，防止冷却一结束又瞬间判定为堵转
                     isStalling = false;
                 } else {
                     motorIntake.setPower(0.8);
@@ -246,13 +272,13 @@ public class AutoAimTeleOp extends LinearOpMode {
             if (aimCommand.hasTarget) {
                 telemetry.addData("Pitch 舵机", "LP: %.3f | RP: %.3f", LP.getPosition(), RP.getPosition());
             }
-            telemetry.addData("飞轮当前 RPM", currentVelocity);
-            telemetry.addData("飞轮目标 RPM", targetVelocity);
-            telemetry.addData("RPM 误差", error);
+            telemetry.addData("飞轮当前 RPM", currentRPM);
+            telemetry.addData("飞轮目标 RPM", targetVelocityRPM);
+            telemetry.addData("RPM 误差", errorRPM);
             telemetry.addData("当前飞轮动力分配", "%.2f", power);
+            telemetry.addData("Integral Sum", integralSum); // 方便你实时监控积分是否饱和
             telemetry.addData("Intake 电流 (A)", "%.2f", intakeCurrent);
 
-            // 方便调试用的防抖状态监控
             if (!isShootingMode && isStalling && getRuntime() >= intakeBrakeReleaseTime) {
                 telemetry.addData("⚠️ 堵转警告", "高电流持续中: %.2f / %.2f 秒",
                         (getRuntime() - stallStartTime), STALL_TIME_THRESHOLD_SEC);
