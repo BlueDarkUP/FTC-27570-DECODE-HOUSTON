@@ -54,7 +54,7 @@ public class AutoAimSubsystem {
     // 目标的有效击打宽度(英寸)，用于动态计算允许的角度误差
     public static double TARGET_HITBOX_WIDTH_INCHES = 8.0;
     // 保底最大角度误差，防止离得太近时容差过大
-    public static double MAX_AIM_ANGLE_TOLERANCE = 3.0;
+    public static double MAX_AIM_ANGLE_TOLERANCE = 5.5;
 
     // ==========================================================
     // === 【Dashboard 调参区】动力学前馈控制 (Feed-Forward) ===
@@ -62,7 +62,7 @@ public class AutoAimSubsystem {
     // 云台电机的速度前馈系数：让云台转动 1度/秒 需要多少电机 Power？
     public static double kV_TURRET = 0.00058;
     // 云台电机的加速度前馈系数：克服云台惯性
-    public static double kA_TURRET = 0.00002;
+    public static double kA_TURRET = 0.00000;
 
     // ==========================================================
     // === 【Dashboard 调参区】双段 PID 控制参数 ===

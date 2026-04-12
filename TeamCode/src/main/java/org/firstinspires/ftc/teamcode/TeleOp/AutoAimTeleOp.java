@@ -47,8 +47,6 @@ public class AutoAimTeleOp extends LinearOpMode {
     private final double MAX_TOLERANCE = 1000;
     private final double MIN_TOLERANCE = 45;
 
-    // ==============================================================
-    // === 【核心修复】激活飞轮前馈控制器 (Feed-Forward) ===
     private final double kP = 0.011;
     private final double kI = 0.0004;
     private final double kD = 0.00000023;
@@ -64,7 +62,6 @@ public class AutoAimTeleOp extends LinearOpMode {
     private final double RP_UP = 0;
     private final double RP_DOWN = 0.5;
 
-    // ================= 状态变量 =================
     private boolean isShootingMode = false;
     private boolean lastCircleState = false;
 
@@ -143,7 +140,6 @@ public class AutoAimTeleOp extends LinearOpMode {
 
         while (opModeIsActive()) {
 
-            // [一] 底盘控制
             double y = -gamepad1.left_stick_y;
             double x = gamepad1.left_stick_x * 1.1;
             double rx = gamepad1.right_stick_x;
@@ -153,22 +149,18 @@ public class AutoAimTeleOp extends LinearOpMode {
             rf.setPower((y - x - rx) / denominator);
             rb.setPower((y + x - rx) / denominator);
 
-            // [二] 自瞄系统更新
             AutoAimSubsystem.TurretCommand aimCommand = autoAim.update(TARGET_X_WORLD, TARGET_Y_WORLD);
 
-            // [三] 俯仰舵机
             if (aimCommand.hasTarget) {
                 setPitchServos(aimCommand.targetPitch);
             }
 
-            // [四] 模式切换
             boolean currentCircleState = gamepad1.b;
             if (currentCircleState && !lastCircleState) {
                 isShootingMode = !isShootingMode;
             }
             lastCircleState = currentCircleState;
 
-            // [五] 目标分配
             double targetVelocityRPM = IDLE_VELOCITY;
             if (isShootingMode) {
                 bbb.setPosition(0.18);
@@ -191,6 +183,9 @@ public class AutoAimTeleOp extends LinearOpMode {
 
             double currentVelTPS = motorSH.getVelocity();
             double targetVelTPS = (targetVelocityRPM * TICKS_PER_REV) / 60.0;
+            double currentRPM = (currentVelTPS * 60.0) / TICKS_PER_REV;
+            double errorRPM = targetVelocityRPM - currentRPM;
+            boolean rpmOK = Math.abs(errorRPM) <= dynamicTolerance;
 
             double dt = timer.seconds();
             timer.reset();
@@ -215,6 +210,18 @@ public class AutoAimTeleOp extends LinearOpMode {
 
             double power = (kF * targetVelTPS) + (kP * errorTPS) + (kI * integralSum) + (kD * derivative);
 
+            double bangBangThreshold = Math.abs(dynamicTolerance) - (Math.abs(dynamicTolerance) / 7.0);
+            String activeBoost = "None";
+
+            if (isShootingMode && targetVelocityRPM > 100) {
+                if (errorRPM > bangBangThreshold) {
+                    power = 1.0;
+                    integralSum = 0;
+                    activeBoost = "Bang-Bang (极速补电)";
+                }
+            }
+
+
             if (targetVelocityRPM <= 0) {
                 power = 0;
                 integralSum = 0;
@@ -224,9 +231,6 @@ public class AutoAimTeleOp extends LinearOpMode {
 
             motorSH.setPower(power);
             motorHS.setPower(power);
-
-            double currentRPM = (currentVelTPS * 60.0) / TICKS_PER_REV;
-            double errorRPM = targetVelocityRPM - currentRPM;
 
             double intakeCurrent = motorIntake.getCurrent(CurrentUnit.AMPS);
 
@@ -248,8 +252,6 @@ public class AutoAimTeleOp extends LinearOpMode {
                     intakeBrakeReleaseTime = 0.0;
 
                 } else {
-                    boolean rpmOK = Math.abs(errorRPM) <= dynamicTolerance;
-
                     if (aimCommand.hasTarget && rpmOK && aimCommand.isAimLocked) {
                         motorIntake.setPower(1.0);
                         telemetry.addData("🔴 发射系统", "⚡ 动态射击中 (FIRE ON THE MOVE)!");
@@ -291,16 +293,16 @@ public class AutoAimTeleOp extends LinearOpMode {
 
             // [八] 遥测输出
             telemetry.addData("当前模式", isShootingMode ? "[ 发射模式 ]" : "[ 怠速模式 ]");
-            telemetry.addData("bbb 舵机位置", bbb.getPosition());
+            telemetry.addData("瞬态接管状态", activeBoost); // >>> 观察是否触发 Bang-Bang
             if (aimCommand.hasTarget) {
                 telemetry.addData("Pitch 舵机", "LP: %.3f | RP: %.3f", LP.getPosition(), RP.getPosition());
             }
             telemetry.addData("飞轮当前 RPM", currentRPM);
             telemetry.addData("飞轮目标 RPM", targetVelocityRPM);
             telemetry.addData("RPM 误差", errorRPM);
-            telemetry.addData("动态容差阈值 (RPM)", "±%.1f", dynamicTolerance);
+            telemetry.addData("动态容差阈值", "±%.1f", dynamicTolerance);
+            telemetry.addData("极速补电触发线", "> %.1f", bangBangThreshold); // >>> 新增遥测，方便对比误差和阈值
             telemetry.addData("当前飞轮动力分配", "%.2f", power);
-            telemetry.addData("Integral Sum", integralSum);
             telemetry.addData("Intake 电流 (A)", "%.2f", intakeCurrent);
 
             if (!isShootingMode && isStalling && getRuntime() >= intakeBrakeReleaseTime) {
