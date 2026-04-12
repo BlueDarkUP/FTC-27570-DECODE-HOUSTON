@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.AutoAim;
 
+import com.acmerobotics.dashboard.config.Config;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -14,6 +15,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.teamcode.Driver.EchoLapse.PinpointPoseProvider;
 
+@Config
 public class AutoAimSubsystem {
 
     private PinpointPoseProvider robotPose;
@@ -22,54 +24,69 @@ public class AutoAimSubsystem {
     private Telemetry telemetry;
     private DcMotorEx turretMotor;
 
-    public final double FIELD_OFFSET_X = 72.0;
-    public final double FIELD_OFFSET_Y = 72.0;
-    public final double TURRET_OFFSET_FWD = -2.5;
-    public final double TURRET_OFFSET_LEFT = 0.0;
+    // ==========================================================
+    // === 【Dashboard 调参区】基础物理结构与坐标映射 ===
+    // ==========================================================
+    public static double FIELD_OFFSET_X = 72.0;
+    public static double FIELD_OFFSET_Y = 72.0;
+    public static double TURRET_OFFSET_FWD = -2.5;
+    public static double TURRET_OFFSET_LEFT = 0.0;
 
-    public final double TURRET_SOFT_LIMIT_CCW = 175.0;
-    public final double TURRET_SOFT_LIMIT_CW = -210.0;
+    public static double TURRET_SOFT_LIMIT_CCW = 175.0;
+    public static double TURRET_SOFT_LIMIT_CW = -210.0;
+    public static double TURRET_START_OFFSET_DEG = 0;
 
-    public final double TURRET_START_OFFSET_DEG = 0;
-    public final double TURRET_TICKS_PER_REV = 32798;
-    public final double TICKS_PER_DEGREE = TURRET_TICKS_PER_REV / 360.0;
-    public final double MAX_PHYSICAL_ACCEL = 10000;
-    public final double IMPACT_COOLDOWN_MS = 100;
-    public final double ALPHA_NORMAL = 0.80;
-    public final double ALPHA_IMPACT = 0.05;
+    // 这两个一般是固定的硬件参数，但也暴露出来方便确认
+    public static double TURRET_TICKS_PER_REV = 32798;
+    public static double TICKS_PER_DEGREE = 32798 / 360.0;
 
-    public final double LL_BASE_FILTER_WEIGHT = 0.7;
-    public final double LL_MAX_TRUST_DISTANCE = 120.0;
+    // ==========================================================
+    // === 【Dashboard 调参区】视觉与撞击过滤系统 ===
+    // ==========================================================
+    public static double MAX_PHYSICAL_ACCEL = 10000;
+    public static double IMPACT_COOLDOWN_MS = 100;
+    public static double ALPHA_NORMAL = 0.80;
+    public static double ALPHA_IMPACT = 0.05;
+
+    public static double LL_BASE_FILTER_WEIGHT = 0.7;
+    public static double LL_MAX_TRUST_DISTANCE = 120.0;
 
     // 目标的有效击打宽度(英寸)，用于动态计算允许的角度误差
-    public final double TARGET_HITBOX_WIDTH_INCHES = 10;
+    public static double TARGET_HITBOX_WIDTH_INCHES = 8.0;
     // 保底最大角度误差，防止离得太近时容差过大
-    public final double MAX_AIM_ANGLE_TOLERANCE = 3.0;
+    public static double MAX_AIM_ANGLE_TOLERANCE = 3.0;
 
     // ==========================================================
-    public double kV_TURRET = 0.00058;
-    public double kA_TURRET = 0.00002;
+    // === 【Dashboard 调参区】动力学前馈控制 (Feed-Forward) ===
+    // ==========================================================
+    // 云台电机的速度前馈系数：让云台转动 1度/秒 需要多少电机 Power？
+    public static double kV_TURRET = 0.00058;
+    // 云台电机的加速度前馈系数：克服云台惯性
+    public static double kA_TURRET = 0.00002;
 
     // ==========================================================
-    // === 第一段 PID 参数 (远距离：大开大合，追求速度，不管摩擦) ===
-    private final double STAGE_THRESHOLD = 14.0;
-    private final double kP_far = 0.05;
-    private final double kI_far = 0.00;
-    private final double kD_far = 0.0003;
+    // === 【Dashboard 调参区】双段 PID 控制参数 ===
+    // ==========================================================
+    // 切换阈值：误差大于此值用第一段，小于此值用第二段
+    public static double STAGE_THRESHOLD = 14.0;
+
+    public static double kP_far = 0.05;
+    public static double kI_far = 0.00;
+    public static double kD_far = 0.0003;
+
+    public static double kP_near = 0.03;
+    public static double kI_near = 0.00005;
+    public static double kD_near = 0.000001;
+
+    public static double kS_near = 0.05;
+    public static double I_ZONE_near = 3.0;
+    public static double MAX_INTEGRAL_POWER = 0.08;
+    public static double ERROR_TOLERANCE = 0.3;
+
 
     // ==========================================================
-    // === 第二段 PID 参数 (近距离：精雕细琢，克服摩擦，防止超调) ===
-    private final double kP_near = 0.03;
-    private final double kI_near = 0.00005;
-    private final double kD_near = 0.000001;
-
-    private final double kS_near = 0.05;
-    private final double I_ZONE_near = 3.0;
-    private final double MAX_INTEGRAL_POWER = 0.08;
-
-    // === 终点死区 ===
-    private final double ERROR_TOLERANCE = 0.3; // 进一步收缩死区
-
+    // === 内部状态变量 (不需要在 Dashboard 调试) ===
+    // ==========================================================
     private long lastLoopTime = 0;
     private double lastRawVxField = 0;
     private double lastRawVyField = 0;
@@ -82,7 +99,6 @@ public class AutoAimSubsystem {
     private boolean isImpactDetected = false;
     private ElapsedTime impactTimer = new ElapsedTime();
 
-    // 双段 PID 状态变量
     private double integralSum = 0;
     private double lastError = 0;
     private boolean wasInStage1 = false;
@@ -159,7 +175,7 @@ public class AutoAimSubsystem {
 
         double dynamicLLWeight = LL_BASE_FILTER_WEIGHT;
         if (speed > 5.0) {
-            dynamicLLWeight = LL_BASE_FILTER_WEIGHT * (5.0 / speed); // 速度每增加，权重反比例下降
+            dynamicLLWeight = LL_BASE_FILTER_WEIGHT * (5.0 / speed);
         }
 
         isLLActiveThisLoop = false;
@@ -254,7 +270,7 @@ public class AutoAimSubsystem {
 
         dynamicToleranceDeg = Math.toDegrees(Math.atan2(TARGET_HITBOX_WIDTH_INCHES / 2.0, distanceToTarget));
         if(dynamicToleranceDeg > MAX_AIM_ANGLE_TOLERANCE) dynamicToleranceDeg = MAX_AIM_ANGLE_TOLERANCE;
-        if(dynamicToleranceDeg < 0.5) dynamicToleranceDeg = 0.5; // 设置极限最小值
+        if(dynamicToleranceDeg < 0.5) dynamicToleranceDeg = 0.5;
 
         if (aim != null && turretMotor != null) {
             command.hasTarget = true;
@@ -282,7 +298,6 @@ public class AutoAimSubsystem {
 
             command.pidErrorDeg = targetEncoderDeg - encoderDeg;
             command.isUnwinding = Math.abs(command.pidErrorDeg) > 45.0;
-
             command.isAimLocked = Math.abs(command.pidErrorDeg) <= dynamicToleranceDeg;
 
             double requiredOmegaFromRotation = -rOmegaDeg;
@@ -293,7 +308,6 @@ public class AutoAimSubsystem {
             double requiredOmegaFromTranslation = Math.toDegrees(tangentialVelocity / Math.sqrt(distSq));
 
             double totalRequiredRelativeOmega = requiredOmegaFromRotation + requiredOmegaFromTranslation;
-
             double requiredAlphaFromRotation = -currentAlphaDeg;
             feedforwardPower = (totalRequiredRelativeOmega * kV_TURRET) + (requiredAlphaFromRotation * kA_TURRET);
         }
@@ -382,7 +396,6 @@ public class AutoAimSubsystem {
 
             telemetry.addData("Turret Control", "%s Pow: %.2f (FF: %.2f) | Err: %.1f°",
                     currentStageName, currentTurretPower, ffPower, command.pidErrorDeg);
-            // 打印动态容差，方便调试
             telemetry.addData("Dynamic Tolerance", "±%.2f°", dynamicToleranceDeg);
 
             telemetry.addData("Turret Angle", "Encoder: %.1f° | RelToFront: %.1f°",
