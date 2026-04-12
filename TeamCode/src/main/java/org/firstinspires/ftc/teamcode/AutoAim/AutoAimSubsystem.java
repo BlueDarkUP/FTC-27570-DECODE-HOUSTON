@@ -43,9 +43,16 @@ public class AutoAimSubsystem {
     public final double LL_FILTER_WEIGHT = 0.1;
     public final double LL_MAX_TRUST_DISTANCE = 90.0;
 
-    private final double kP = 0.055;
-    private final double kI = 0.0022;
-    private final double kD = 0.00075;
+    private final double kP = 0.035;
+    private final double kI = 0.001;
+    private final double kD = 0.0015;
+
+    private final double kS = 0.06;
+
+    private final double I_ZONE = 8.0;
+
+    private final double MAX_INTEGRAL_POWER = 0.2;
+    private final double ERROR_TOLERANCE = 0.8;
 
     private long lastLoopTime = 0;
     private double lastRawVxField = 0;
@@ -68,7 +75,7 @@ public class AutoAimSubsystem {
         public double targetRpm = 0;
         public double targetPitch = 0;
         public double targetDistance = 0;
-        public boolean isUnwinding = false; // 【新增】标记云台是否正在大角度掉头/复位
+        public boolean isUnwinding = false;
     }
 
     public AutoAimSubsystem(HardwareMap hardwareMap, Telemetry telemetry) {
@@ -230,7 +237,6 @@ public class AutoAimSubsystem {
 
             command.pidErrorDeg = targetEncoderDeg - encoderDeg;
 
-            // 【新增】：当目标误差超过 45 度时，判定为正在进行大角度复位或掉头
             command.isUnwinding = Math.abs(command.pidErrorDeg) > 45.0;
         }
 
@@ -240,14 +246,47 @@ public class AutoAimSubsystem {
                 double dt = pidTimer.seconds();
                 if (dt == 0) dt = 0.001;
 
-                integralSum += error * dt;
-                double derivative = (error - lastError) / dt;
+                // 【核心优化 1】死区控制 (Deadband)
+                if (Math.abs(error) <= ERROR_TOLERANCE) {
+                    // 进入死区，视为到达目标，切断动力并清空积分
+                    turretMotor.setPower(0);
+                    currentTurretPower = 0;
+                    integralSum = 0;
+                } else {
+                    // 【核心优化 2】过零清空积分 (Zero-Crossing Clearing)
+                    // 如果这次的误差和上次的误差符号相反，说明我们刚刚越过了目标点
+                    if (Math.signum(error) != Math.signum(lastError)) {
+                        integralSum = 0;
+                    }
 
-                double power = (kP * error) + (kI * integralSum) + (kD * derivative);
-                power = Math.max(-1.0, Math.min(1.0, power));
+                    // 【核心优化 3】积分区间与限幅 (I-Zone & Anti-Windup)
+                    if (Math.abs(error) < I_ZONE) {
+                        integralSum += error * dt;
+                        // 限制积分累加的最大效果，防止积分饱和
+                        double maxISum = MAX_INTEGRAL_POWER / (kI == 0 ? 1 : kI);
+                        integralSum = Math.max(-maxISum, Math.min(maxISum, integralSum));
+                    } else {
+                        // 如果误差很大，根本不进行积分累加
+                        integralSum = 0;
+                    }
 
-                turretMotor.setPower(power);
-                currentTurretPower = power;
+                    double derivative = (error - lastError) / dt;
+
+                    // 计算基础 PID 动力
+                    double pidPower = (kP * error) + (kI * integralSum) + (kD * derivative);
+
+                    // 【核心优化 4】静摩擦力前馈 (Static Friction Feedforward)
+                    // Math.signum(error) 会返回 1.0 (正误差) 或 -1.0 (负误差)
+                    double feedforward = Math.signum(error) * kS;
+
+                    // 最终动力 = PID动力 + 克服静摩擦力的最小动力
+                    double power = pidPower + feedforward;
+
+                    power = Math.max(-1.0, Math.min(1.0, power));
+
+                    turretMotor.setPower(power);
+                    currentTurretPower = power;
+                }
 
                 lastError = error;
                 pidTimer.reset();

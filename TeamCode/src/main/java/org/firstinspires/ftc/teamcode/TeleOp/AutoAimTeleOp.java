@@ -8,7 +8,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
-import com.qualcomm.robotcore.util.ElapsedTime; // 新增 ElapsedTime 导入
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
@@ -39,8 +39,13 @@ public class AutoAimTeleOp extends LinearOpMode {
     private final double TARGET_X_WORLD = 133.0;
     private final double TARGET_Y_WORLD = 134.0;
 
-    private final double IDLE_VELOCITY = 1000.0;
-    private final double VELOCITY_TOLERANCE = 200.0; // 容差b (RPM)
+    private final double IDLE_VELOCITY = 3000.0;
+
+    // 【修改点】引入线性映射的动态容差参数：转速越高，要求越严，容差越小
+    private final double RPM_LOWER_BOUND = 3000.0; // 参考近战转速
+    private final double RPM_UPPER_BOUND = 5100.0; // 参考远射转速
+    private final double MAX_TOLERANCE = 250.0;    // 低速时的最大宽松容差 (RPM)
+    private final double MIN_TOLERANCE = 50.0;     // 高速时的最严苛容差 (RPM)
 
     private final double kP = 0.011;
     private final double kI = 0.0004;
@@ -48,7 +53,7 @@ public class AutoAimTeleOp extends LinearOpMode {
     private final double kF = 0.0;
     private final double TICKS_PER_REV = 28.0;
 
-    private final double STALL_CURRENT_AMPS = 2.5;
+    private final double STALL_CURRENT_AMPS = 2.45;
     private final double STALL_COOLDOWN_SEC = 0.5;
     private final double STALL_TIME_THRESHOLD_SEC = 0.3;
 
@@ -172,6 +177,16 @@ public class AutoAimTeleOp extends LinearOpMode {
                 bbb.setPosition(0);
             }
 
+            double dynamicTolerance;
+            if (targetVelocityRPM <= RPM_LOWER_BOUND) {
+                dynamicTolerance = MAX_TOLERANCE;
+            } else if (targetVelocityRPM >= RPM_UPPER_BOUND) {
+                dynamicTolerance = MIN_TOLERANCE;
+            } else {
+                double ratio = (targetVelocityRPM - RPM_LOWER_BOUND) / (RPM_UPPER_BOUND - RPM_LOWER_BOUND);
+                dynamicTolerance = MAX_TOLERANCE - ratio * (MAX_TOLERANCE - MIN_TOLERANCE);
+            }
+
             double currentVelTPS = motorSH.getVelocity();
             double targetVelTPS = (targetVelocityRPM * TICKS_PER_REV) / 60.0;
 
@@ -232,7 +247,7 @@ public class AutoAimTeleOp extends LinearOpMode {
                     intakeBrakeReleaseTime = 0.0;
 
                 } else {
-                    if (Math.abs(errorRPM) <= VELOCITY_TOLERANCE && aimCommand.hasTarget) {
+                    if (Math.abs(errorRPM) <= dynamicTolerance && aimCommand.hasTarget) {
                         motorIntake.setPower(1.0);
                         telemetry.addData("🔴 发射系统", "开火中 (FIRE!)");
                     } else {
@@ -275,8 +290,9 @@ public class AutoAimTeleOp extends LinearOpMode {
             telemetry.addData("飞轮当前 RPM", currentRPM);
             telemetry.addData("飞轮目标 RPM", targetVelocityRPM);
             telemetry.addData("RPM 误差", errorRPM);
+            telemetry.addData("动态容差阈值 (RPM)", "±%.1f", dynamicTolerance);
             telemetry.addData("当前飞轮动力分配", "%.2f", power);
-            telemetry.addData("Integral Sum", integralSum); // 方便你实时监控积分是否饱和
+            telemetry.addData("Integral Sum", integralSum);
             telemetry.addData("Intake 电流 (A)", "%.2f", intakeCurrent);
 
             if (!isShootingMode && isStalling && getRuntime() >= intakeBrakeReleaseTime) {
