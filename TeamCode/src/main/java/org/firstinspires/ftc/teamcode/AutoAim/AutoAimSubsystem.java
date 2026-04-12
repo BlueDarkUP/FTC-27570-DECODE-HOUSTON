@@ -43,6 +43,14 @@ public class AutoAimSubsystem {
     public final double LL_FILTER_WEIGHT = 0.7;
     public final double LL_MAX_TRUST_DISTANCE = 120.0;
 
+    // 允许开火的最大云台角度误差(度)，放宽一点交给前馈去保持
+    public final double AIM_ANGLE_TOLERANCE = 2;
+
+    // ==========================================================
+    // === 【新增】前馈控制参数 (Feed-Forward) ===
+    // 云台电机的速度前馈系数：让云台转动 1度/秒 需要多少电机 Power？
+    public double kV_TURRET = 0.00058;
+
     // ==========================================================
     // === 第一段 PID 参数 (远距离：大开大合，追求速度，不管摩擦) ===
     // ==========================================================
@@ -93,6 +101,7 @@ public class AutoAimSubsystem {
         public double targetPitch = 0;
         public double targetDistance = 0;
         public boolean isUnwinding = false;
+        public boolean isAimLocked = false;
     }
 
     public AutoAimSubsystem(HardwareMap hardwareMap, Telemetry telemetry) {
@@ -141,7 +150,10 @@ public class AutoAimSubsystem {
         double rH_Rad = robotPose.getHeading(AngleUnit.RADIANS);
         double rVx = -robotPose.getXVelocity(DistanceUnit.INCH);
         double rVy = robotPose.getYVelocity(DistanceUnit.INCH);
-        double rOmega = robotPose.getHeadingVelocity(AngleUnit.RADIANS);
+
+        double rOmegaRad = robotPose.getHeadingVelocity(AngleUnit.RADIANS);
+        double rOmegaDeg = Math.toDegrees(rOmegaRad);
+
         double speed = Math.hypot(rVx, rVy);
 
         double chassisDistToTarget = Math.hypot(targetX - rX, targetY - rY);
@@ -185,8 +197,8 @@ public class AutoAimSubsystem {
         double sinH = Math.sin(rH_Rad);
         double turretX = rX + (TURRET_OFFSET_FWD * (-sinH)) + (TURRET_OFFSET_LEFT * (-cosH));
         double turretY = rY + (TURRET_OFFSET_FWD * ( cosH)) + (TURRET_OFFSET_LEFT * (-sinH));
-        double tanVx = (TURRET_OFFSET_FWD * -cosH * rOmega) + (TURRET_OFFSET_LEFT * sinH * rOmega);
-        double tanVy = (TURRET_OFFSET_FWD * -sinH * rOmega) + (TURRET_OFFSET_LEFT * -cosH * rOmega);
+        double tanVx = (TURRET_OFFSET_FWD * -cosH * rOmegaRad) + (TURRET_OFFSET_LEFT * sinH * rOmegaRad);
+        double tanVy = (TURRET_OFFSET_FWD * -sinH * rOmegaRad) + (TURRET_OFFSET_LEFT * -cosH * rOmegaRad);
         double turretVx = rVx + tanVx;
         double turretVy = rVy + tanVy;
 
@@ -200,6 +212,7 @@ public class AutoAimSubsystem {
 
         double dtNano = (System.nanoTime() - lastLoopTime) / 1.0E9;
         if(dtNano < 0.001) dtNano = 0.001;
+
         double accel = Math.hypot((turretVx - lastRawVxField)/dtNano, (turretVy - lastRawVyField)/dtNano);
         lastRawVxField = turretVx;
         lastRawVyField = turretVy;
@@ -223,6 +236,7 @@ public class AutoAimSubsystem {
         );
 
         double distanceToTarget = Math.hypot(targetX - turretX, targetY - turretY);
+        double feedforwardPower = 0.0;
 
         if (aim != null && turretMotor != null) {
             command.hasTarget = true;
@@ -255,6 +269,25 @@ public class AutoAimSubsystem {
             command.pidErrorDeg = targetEncoderDeg - encoderDeg;
 
             command.isUnwinding = Math.abs(command.pidErrorDeg) > 45.0;
+
+            command.isAimLocked = Math.abs(command.pidErrorDeg) <= AIM_ANGLE_TOLERANCE;
+
+            // 1. 底盘旋转前馈：底盘转了多少度/秒，云台就需要反向转多少度/秒
+            double requiredOmegaFromRotation = -rOmegaDeg;
+
+            // 2. 底盘平移前馈：计算底盘横移导致的目标绝对角度变化率 (deg/s)
+            double dx = targetX - turretX;
+            double dy = targetY - turretY;
+            double distSq = dx * dx + dy * dy;
+            // 叉乘计算切向相对速度
+            double tangentialVelocity = (turretVx * dy - turretVy * dx) / Math.sqrt(distSq);
+            double requiredOmegaFromTranslation = Math.toDegrees(tangentialVelocity / Math.sqrt(distSq));
+
+            // 云台相对于底盘所需的总角速度
+            double totalRequiredRelativeOmega = requiredOmegaFromRotation + requiredOmegaFromTranslation;
+
+            // 转化为前馈动力
+            feedforwardPower = totalRequiredRelativeOmega * kV_TURRET;
         }
 
         if (turretMotor != null) {
@@ -264,18 +297,14 @@ public class AutoAimSubsystem {
                 double dt = pidTimer.seconds();
                 if (dt == 0) dt = 0.001;
 
-                double power = 0.0;
+                double pidPower = 0.0;
 
-                // ================= 双段 PID 核心逻辑接入 =================
-
-                // 【状态机 1：到达死区】
                 if (absError <= ERROR_TOLERANCE) {
-                    power = 0;
+                    pidPower = 0;
                     integralSum = 0;
                     currentStageName = "【到达目标】";
                     wasInStage1 = false;
                 }
-                // 【状态机 2：第一段 (远距离)】
                 else if (absError > STAGE_THRESHOLD) {
                     currentStageName = "【第一段】(远距)";
                     wasInStage1 = true;
@@ -283,13 +312,11 @@ public class AutoAimSubsystem {
                     integralSum += error * dt;
                     double derivative = (error - lastError) / dt;
 
-                    power = (kP_far * error) + (kI_far * integralSum) + (kD_far * derivative);
+                    pidPower = (kP_far * error) + (kI_far * integralSum) + (kD_far * derivative);
                 }
-                // 【状态机 3：第二段 (近距离精调)】
                 else {
                     currentStageName = "【第二段】(近距)";
 
-                    // 阶段切换或穿过目标点时重置积分
                     if (wasInStage1 || Math.signum(error) != Math.signum(lastError)) {
                         integralSum = 0;
                         wasInStage1 = false;
@@ -304,17 +331,16 @@ public class AutoAimSubsystem {
                     }
 
                     double derivative = (error - lastError) / dt;
-                    double pidPower = (kP_near * error) + (kI_near * integralSum) + (kD_near * derivative);
 
-                    // 静摩擦力前馈
-                    double feedforward = Math.signum(error) * kS_near;
-
-                    power = pidPower + feedforward;
+                    double frictionFF = Math.signum(error) * kS_near;
+                    pidPower = (kP_near * error) + (kI_near * integralSum) + (kD_near * derivative) + frictionFF;
                 }
 
-                power = Math.max(-1.0, Math.min(1.0, power));
-                turretMotor.setPower(power);
-                currentTurretPower = power;
+                double finalPower = pidPower + feedforwardPower;
+                finalPower = Math.max(-1.0, Math.min(1.0, finalPower));
+
+                turretMotor.setPower(finalPower);
+                currentTurretPower = finalPower;
 
                 lastError = error;
                 pidTimer.reset();
@@ -330,12 +356,12 @@ public class AutoAimSubsystem {
             }
         }
 
-        printTelemetry(aim, command, rX, rY, targetX, targetY);
+        printTelemetry(aim, command, rX, rY, targetX, targetY, feedforwardPower);
 
         return command;
     }
 
-    private void printTelemetry(AimCalculator.AimResult aim, TurretCommand command, double rX, double rY, double targetX, double targetY) {
+    private void printTelemetry(AimCalculator.AimResult aim, TurretCommand command, double rX, double rY, double targetX, double targetY, double ffPower) {
         telemetry.addData("AutoAim Status", isImpactDetected ? "[! IMPACT !]" : "[ OK ]");
         telemetry.addData("Chassis Pos", "X:%.1f  Y:%.1f", rX, rY);
         telemetry.addData("Vision Filter", isLLActiveThisLoop ? "ACTIVE (Smoothing Drift)" : "DISABLED (Too far/Moving)");
@@ -346,9 +372,8 @@ public class AutoAimSubsystem {
 
             double encDeg = turretMotor.getCurrentPosition() / TICKS_PER_DEGREE;
 
-            // 新增了阶段名称的输出，方便在主 TeleOp 中随时监控云台状态
-            telemetry.addData("Turret Control", "%s Pow: %.2f | Err: %.1f° | Tgt: %.1f°",
-                    currentStageName, currentTurretPower, command.pidErrorDeg, (encDeg + command.pidErrorDeg));
+            telemetry.addData("Turret Control", "%s Pow: %.2f (FF: %.2f) | Err: %.1f°",
+                    currentStageName, currentTurretPower, ffPower, command.pidErrorDeg);
 
             telemetry.addData("Turret Angle", "Encoder: %.1f° | RelToFront: %.1f°",
                     encDeg, AngleUnit.normalizeDegrees(encDeg + TURRET_START_OFFSET_DEG));

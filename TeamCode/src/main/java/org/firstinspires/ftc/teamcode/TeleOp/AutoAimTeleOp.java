@@ -41,16 +41,21 @@ public class AutoAimTeleOp extends LinearOpMode {
 
     private final double IDLE_VELOCITY = 3000.0;
 
-    // 【修改点】引入线性映射的动态容差参数：转速越高，要求越严，容差越小
-    private final double RPM_LOWER_BOUND = 3000.0; // 参考近战转速
-    private final double RPM_UPPER_BOUND = 5050.0; // 参考远射转速
-    private final double MAX_TOLERANCE = 1000;    // 低速时的最大宽松容差 (RPM)
-    private final double MIN_TOLERANCE = 45;     // 高速时的最严苛容差 (RPM)etr
+    // 引入线性映射的动态容差参数：转速越高，要求越严，容差越小
+    private final double RPM_LOWER_BOUND = 3000.0;
+    private final double RPM_UPPER_BOUND = 5050.0;
+    private final double MAX_TOLERANCE = 1000;
+    private final double MIN_TOLERANCE = 45;
 
+    // ==============================================================
+    // === 【核心修复】激活飞轮前馈控制器 (Feed-Forward) ===
+    // kF = 1.0 / (飞轮电机在满电1.0 Power时的最大 TPS)
+    // 假设 6000 RPM 电机，TICKS=28，理论最大 TPS 约为 2800，因此 kF 约为 0.00035
+    // ==============================================================
     private final double kP = 0.011;
     private final double kI = 0.0004;
     private final double kD = 0.00000023;
-    private final double kF = 0.0;
+    private final double kF = 0.00033;
     private final double TICKS_PER_REV = 28.0;
 
     private final double STALL_CURRENT_AMPS = 2.45;
@@ -232,9 +237,8 @@ public class AutoAimTeleOp extends LinearOpMode {
                 isStalling = false;
 
                 if (aimCommand.hasTarget && aimCommand.isUnwinding) {
-
                     if (!wasUnwinding) {
-                        unwindReverseEndTime = getRuntime() + 0.2;
+                        unwindReverseEndTime = getRuntime() + 0.35;
                     }
 
                     if (getRuntime() < unwindReverseEndTime) {
@@ -247,12 +251,20 @@ public class AutoAimTeleOp extends LinearOpMode {
                     intakeBrakeReleaseTime = 0.0;
 
                 } else {
-                    if (Math.abs(errorRPM) <= dynamicTolerance && aimCommand.hasTarget) {
+                    boolean rpmOK = Math.abs(errorRPM) <= dynamicTolerance;
+
+                    if (aimCommand.hasTarget && rpmOK && aimCommand.isAimLocked) {
                         motorIntake.setPower(1.0);
-                        telemetry.addData("🔴 发射系统", "开火中 (FIRE!)");
+                        telemetry.addData("🔴 发射系统", "⚡ 动态射击中 (FIRE ON THE MOVE)!");
                     } else {
                         motorIntake.setPower(0.0);
-                        telemetry.addData("🔴 发射系统", "预热/调速中...");
+                        if (!aimCommand.hasTarget) {
+                            telemetry.addData("🔴 发射系统", "等待目标...");
+                        } else if (!rpmOK) {
+                            telemetry.addData("🔴 发射系统", "飞轮调速中 (RPM未达标)...");
+                        } else if (!aimCommand.isAimLocked) {
+                            telemetry.addData("🔴 发射系统", "云台动态追瞄中 (角度未锁定)...");
+                        }
                     }
                 }
 
