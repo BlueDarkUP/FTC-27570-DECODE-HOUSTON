@@ -49,9 +49,6 @@ public class AutoAimTeleOp extends LinearOpMode {
 
     // ==============================================================
     // === 【核心修复】激活飞轮前馈控制器 (Feed-Forward) ===
-    // kF = 1.0 / (飞轮电机在满电1.0 Power时的最大 TPS)
-    // 假设 6000 RPM 电机，TICKS=28，理论最大 TPS 约为 2800，因此 kF 约为 0.00035
-    // ==============================================================
     private final double kP = 0.011;
     private final double kI = 0.0004;
     private final double kD = 0.00000023;
@@ -263,7 +260,7 @@ public class AutoAimTeleOp extends LinearOpMode {
                         } else if (!rpmOK) {
                             telemetry.addData("🔴 发射系统", "飞轮调速中 (RPM未达标)...");
                         } else if (!aimCommand.isAimLocked) {
-                            telemetry.addData("🔴 发射系统", "云台动态追瞄中 (角度未锁定)...");
+                            telemetry.addData("🔴 发射系统", "云台动态追瞄中 (等待角度容差锁定)...");
                         }
                     }
                 }
@@ -280,7 +277,6 @@ public class AutoAimTeleOp extends LinearOpMode {
                     isStalling = false;
                 }
 
-                // 执行逻辑
                 if (getRuntime() < intakeBrakeReleaseTime) {
                     motorIntake.setPower(0.0);
                     telemetry.addData("🟢 发射系统", "⚠️ INTAKE堵转保护触发！(刹车冷却中)");

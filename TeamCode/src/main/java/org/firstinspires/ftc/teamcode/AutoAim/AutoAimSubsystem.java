@@ -33,27 +33,25 @@ public class AutoAimSubsystem {
     public final double TURRET_START_OFFSET_DEG = 0;
     public final double TURRET_TICKS_PER_REV = 32798;
     public final double TICKS_PER_DEGREE = TURRET_TICKS_PER_REV / 360.0;
-
-    public final double STATIONARY_SPEED_LIMIT = 5.0;
     public final double MAX_PHYSICAL_ACCEL = 10000;
     public final double IMPACT_COOLDOWN_MS = 100;
     public final double ALPHA_NORMAL = 0.80;
     public final double ALPHA_IMPACT = 0.05;
 
-    public final double LL_FILTER_WEIGHT = 0.7;
+    public final double LL_BASE_FILTER_WEIGHT = 0.7;
     public final double LL_MAX_TRUST_DISTANCE = 120.0;
 
-    // 允许开火的最大云台角度误差(度)，放宽一点交给前馈去保持
-    public final double AIM_ANGLE_TOLERANCE = 2;
+    // 目标的有效击打宽度(英寸)，用于动态计算允许的角度误差
+    public final double TARGET_HITBOX_WIDTH_INCHES = 10;
+    // 保底最大角度误差，防止离得太近时容差过大
+    public final double MAX_AIM_ANGLE_TOLERANCE = 3.0;
 
     // ==========================================================
-    // === 【新增】前馈控制参数 (Feed-Forward) ===
-    // 云台电机的速度前馈系数：让云台转动 1度/秒 需要多少电机 Power？
     public double kV_TURRET = 0.00058;
+    public double kA_TURRET = 0.00002;
 
     // ==========================================================
     // === 第一段 PID 参数 (远距离：大开大合，追求速度，不管摩擦) ===
-    // ==========================================================
     private final double STAGE_THRESHOLD = 14.0;
     private final double kP_far = 0.05;
     private final double kI_far = 0.00;
@@ -61,7 +59,6 @@ public class AutoAimSubsystem {
 
     // ==========================================================
     // === 第二段 PID 参数 (近距离：精雕细琢，克服摩擦，防止超调) ===
-    // ==========================================================
     private final double kP_near = 0.03;
     private final double kI_near = 0.00005;
     private final double kD_near = 0.000001;
@@ -70,16 +67,18 @@ public class AutoAimSubsystem {
     private final double I_ZONE_near = 3.0;
     private final double MAX_INTEGRAL_POWER = 0.08;
 
-    // ==========================================================
     // === 终点死区 ===
-    // ==========================================================
-    private final double ERROR_TOLERANCE = 0.5;
+    private final double ERROR_TOLERANCE = 0.3; // 进一步收缩死区
 
     private long lastLoopTime = 0;
     private double lastRawVxField = 0;
     private double lastRawVyField = 0;
     private double lastSmoothVxField = 0;
     private double lastSmoothVyField = 0;
+    private double lastSmoothAxField = 0;
+    private double lastSmoothAyField = 0;
+    private double lastROmegaDeg = 0;
+
     private boolean isImpactDetected = false;
     private ElapsedTime impactTimer = new ElapsedTime();
 
@@ -93,6 +92,7 @@ public class AutoAimSubsystem {
     private double currentTurretPower = 0;
 
     private boolean isLLActiveThisLoop = false;
+    private double dynamicToleranceDeg = 2.0;
 
     public static class TurretCommand {
         public boolean hasTarget = false;
@@ -155,13 +155,17 @@ public class AutoAimSubsystem {
         double rOmegaDeg = Math.toDegrees(rOmegaRad);
 
         double speed = Math.hypot(rVx, rVy);
-
         double chassisDistToTarget = Math.hypot(targetX - rX, targetY - rY);
+
+        double dynamicLLWeight = LL_BASE_FILTER_WEIGHT;
+        if (speed > 5.0) {
+            dynamicLLWeight = LL_BASE_FILTER_WEIGHT * (5.0 / speed); // 速度每增加，权重反比例下降
+        }
 
         isLLActiveThisLoop = false;
         if (ll != null) {
             LLResult result = ll.getLatestResult();
-            if (result != null && result.isValid() && speed < STATIONARY_SPEED_LIMIT && chassisDistToTarget < LL_MAX_TRUST_DISTANCE) {
+            if (result != null && result.isValid() && chassisDistToTarget < LL_MAX_TRUST_DISTANCE) {
                 Pose3D botpose = result.getBotpose();
                 double llRawX_Meters = botpose.getPosition().x;
                 double llRawY_Meters = botpose.getPosition().y;
@@ -182,11 +186,11 @@ public class AutoAimSubsystem {
                 double currentOdoY = robotPose.getY(DistanceUnit.INCH);
                 double currentOdoH = robotPose.getHeading(AngleUnit.RADIANS);
 
-                double newX = currentOdoX + (targetLLPose.getX(DistanceUnit.INCH) - currentOdoX) * LL_FILTER_WEIGHT;
-                double newY = currentOdoY + (targetLLPose.getY(DistanceUnit.INCH) - currentOdoY) * LL_FILTER_WEIGHT;
+                double newX = currentOdoX + (targetLLPose.getX(DistanceUnit.INCH) - currentOdoX) * dynamicLLWeight;
+                double newY = currentOdoY + (targetLLPose.getY(DistanceUnit.INCH) - currentOdoY) * dynamicLLWeight;
 
                 double angleDiff = AngleUnit.normalizeRadians(targetLLPose.getHeading(AngleUnit.RADIANS) - currentOdoH);
-                double newH = AngleUnit.normalizeRadians(currentOdoH + (angleDiff * LL_FILTER_WEIGHT));
+                double newH = AngleUnit.normalizeRadians(currentOdoH + (angleDiff * dynamicLLWeight));
 
                 robotPose.setPose(new Pose2D(DistanceUnit.INCH, newX, newY, AngleUnit.RADIANS, newH));
                 isLLActiveThisLoop = true;
@@ -202,22 +206,28 @@ public class AutoAimSubsystem {
         double turretVx = rVx + tanVx;
         double turretVy = rVy + tanVy;
 
+        double dtNano = (System.nanoTime() - lastLoopTime);
+        double dtSec = dtNano / 1.0E9;
+        if(dtSec < 0.001) dtSec = 0.001;
+
         if (lastLoopTime == 0) {
-            lastLoopTime = System.nanoTime();
             lastRawVxField = turretVx;
             lastRawVyField = turretVy;
             lastSmoothVxField = turretVx;
             lastSmoothVyField = turretVy;
+            lastROmegaDeg = rOmegaDeg;
         }
 
-        double dtNano = (System.nanoTime() - lastLoopTime) / 1.0E9;
-        if(dtNano < 0.001) dtNano = 0.001;
+        double currentAx = (turretVx - lastRawVxField) / dtSec;
+        double currentAy = (turretVy - lastRawVyField) / dtSec;
+        double currentAlphaDeg = (rOmegaDeg - lastROmegaDeg) / dtSec;
 
-        double accel = Math.hypot((turretVx - lastRawVxField)/dtNano, (turretVy - lastRawVyField)/dtNano);
+        double accelMag = Math.hypot(currentAx, currentAy);
         lastRawVxField = turretVx;
         lastRawVyField = turretVy;
+        lastROmegaDeg = rOmegaDeg;
 
-        if (accel > MAX_PHYSICAL_ACCEL) {
+        if (accelMag > MAX_PHYSICAL_ACCEL) {
             isImpactDetected = true;
             impactTimer.reset();
         } else if (impactTimer.milliseconds() > IMPACT_COOLDOWN_MS) {
@@ -227,16 +237,24 @@ public class AutoAimSubsystem {
         double alpha = isImpactDetected ? ALPHA_IMPACT : ALPHA_NORMAL;
         double smoothVx = lastSmoothVxField * (1.0 - alpha) + turretVx * alpha;
         double smoothVy = lastSmoothVyField * (1.0 - alpha) + turretVy * alpha;
+
+        lastSmoothAxField = lastSmoothAxField * (1.0 - alpha) + currentAx * alpha;
+        lastSmoothAyField = lastSmoothAyField * (1.0 - alpha) + currentAy * alpha;
+
         lastSmoothVxField = smoothVx;
         lastSmoothVyField = smoothVy;
         lastLoopTime = System.nanoTime();
 
         AimCalculator.AimResult aim = AimCalculator.solveAim(
-                turretX, turretY, smoothVx, smoothVy, targetX, targetY
+                turretX, turretY, smoothVx, smoothVy, lastSmoothAxField, lastSmoothAyField, targetX, targetY
         );
 
         double distanceToTarget = Math.hypot(targetX - turretX, targetY - turretY);
         double feedforwardPower = 0.0;
+
+        dynamicToleranceDeg = Math.toDegrees(Math.atan2(TARGET_HITBOX_WIDTH_INCHES / 2.0, distanceToTarget));
+        if(dynamicToleranceDeg > MAX_AIM_ANGLE_TOLERANCE) dynamicToleranceDeg = MAX_AIM_ANGLE_TOLERANCE;
+        if(dynamicToleranceDeg < 0.5) dynamicToleranceDeg = 0.5; // 设置极限最小值
 
         if (aim != null && turretMotor != null) {
             command.hasTarget = true;
@@ -248,13 +266,9 @@ public class AutoAimSubsystem {
             double currentChassisHeading = robotPose.getHeading(AngleUnit.DEGREES);
 
             double encoderDeg = turretMotor.getCurrentPosition() / TICKS_PER_DEGREE;
-
             double currentTurretRelDegToChassis = encoderDeg + TURRET_START_OFFSET_DEG;
-
             double desiredRelDegToChassis = targetAbsHeading - currentChassisHeading;
-
             double shortestPathError = AngleUnit.normalizeDegrees(desiredRelDegToChassis - currentTurretRelDegToChassis);
-
             double targetEncoderDeg = encoderDeg + shortestPathError;
 
             if (targetEncoderDeg > TURRET_SOFT_LIMIT_CCW) {
@@ -267,27 +281,21 @@ public class AutoAimSubsystem {
             if (targetEncoderDeg < TURRET_SOFT_LIMIT_CW) targetEncoderDeg = TURRET_SOFT_LIMIT_CW;
 
             command.pidErrorDeg = targetEncoderDeg - encoderDeg;
-
             command.isUnwinding = Math.abs(command.pidErrorDeg) > 45.0;
 
-            command.isAimLocked = Math.abs(command.pidErrorDeg) <= AIM_ANGLE_TOLERANCE;
+            command.isAimLocked = Math.abs(command.pidErrorDeg) <= dynamicToleranceDeg;
 
-            // 1. 底盘旋转前馈：底盘转了多少度/秒，云台就需要反向转多少度/秒
             double requiredOmegaFromRotation = -rOmegaDeg;
-
-            // 2. 底盘平移前馈：计算底盘横移导致的目标绝对角度变化率 (deg/s)
             double dx = targetX - turretX;
             double dy = targetY - turretY;
             double distSq = dx * dx + dy * dy;
-            // 叉乘计算切向相对速度
             double tangentialVelocity = (turretVx * dy - turretVy * dx) / Math.sqrt(distSq);
             double requiredOmegaFromTranslation = Math.toDegrees(tangentialVelocity / Math.sqrt(distSq));
 
-            // 云台相对于底盘所需的总角速度
             double totalRequiredRelativeOmega = requiredOmegaFromRotation + requiredOmegaFromTranslation;
 
-            // 转化为前馈动力
-            feedforwardPower = totalRequiredRelativeOmega * kV_TURRET;
+            double requiredAlphaFromRotation = -currentAlphaDeg;
+            feedforwardPower = (totalRequiredRelativeOmega * kV_TURRET) + (requiredAlphaFromRotation * kA_TURRET);
         }
 
         if (turretMotor != null) {
@@ -364,7 +372,7 @@ public class AutoAimSubsystem {
     private void printTelemetry(AimCalculator.AimResult aim, TurretCommand command, double rX, double rY, double targetX, double targetY, double ffPower) {
         telemetry.addData("AutoAim Status", isImpactDetected ? "[! IMPACT !]" : "[ OK ]");
         telemetry.addData("Chassis Pos", "X:%.1f  Y:%.1f", rX, rY);
-        telemetry.addData("Vision Filter", isLLActiveThisLoop ? "ACTIVE (Smoothing Drift)" : "DISABLED (Too far/Moving)");
+        telemetry.addData("Vision Filter", isLLActiveThisLoop ? "ACTIVE (Moving/Stationary Fusion)" : "DISABLED (Too far)");
 
         if(aim != null && command.hasTarget) {
             telemetry.addData("Target Locked", "WorldX:%.0f WorldY:%.0f | Dist: %.1f in", targetX, targetY, command.targetDistance);
@@ -374,6 +382,8 @@ public class AutoAimSubsystem {
 
             telemetry.addData("Turret Control", "%s Pow: %.2f (FF: %.2f) | Err: %.1f°",
                     currentStageName, currentTurretPower, ffPower, command.pidErrorDeg);
+            // 打印动态容差，方便调试
+            telemetry.addData("Dynamic Tolerance", "±%.2f°", dynamicToleranceDeg);
 
             telemetry.addData("Turret Angle", "Encoder: %.1f° | RelToFront: %.1f°",
                     encDeg, AngleUnit.normalizeDegrees(encDeg + TURRET_START_OFFSET_DEG));

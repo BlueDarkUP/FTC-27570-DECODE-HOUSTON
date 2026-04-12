@@ -10,6 +10,8 @@ public class AimCalculator {
     // 格式: 距离(inch), RPM, Pitch, 飞行时间(s)
     // =========================================================
 
+    public static double MECHANICAL_SHOOT_DELAY = 0.1;
+
     // 数据点 1：近战
     public static double P1_DIST = 21.0;
     public static double P1_RPM = 3000;
@@ -62,7 +64,7 @@ public class AimCalculator {
         return currentData[0][col];
     }
 
-    public static AimResult solveAim(double rx, double ry, double vx, double vy, double tx, double ty) {
+    public static AimResult solveAim(double rx, double ry, double vx, double vy, double ax, double ay, double tx, double ty) {
         double dx = tx - rx;
         double dy = ty - ry;
         double dist = Math.hypot(dx, dy);
@@ -71,16 +73,25 @@ public class AimCalculator {
         double tf = interpolate(dist, 3);
         double vDist = dist;
 
-        // 迭代两次以提高预测精度
         for (int i = 0; i < 2; i++) {
-            double predictedX = tx - (vx * tf);
-            double predictedY = ty - (vy * tf);
-            vDist = Math.hypot(predictedX - rx, predictedY - ry);
+            double totalTime = tf + MECHANICAL_SHOOT_DELAY;
+
+            double chassisDisplacementX = (vx * totalTime) + (0.5 * ax * totalTime * totalTime);
+            double chassisDisplacementY = (vy * totalTime) + (0.5 * ay * totalTime * totalTime);
+
+            double predictedX = tx - rx - chassisDisplacementX;
+            double predictedY = ty - ry - chassisDisplacementY;
+
+            vDist = Math.hypot(predictedX, predictedY);
             tf = interpolate(vDist, 3);
         }
 
-        double finalDX = dx - vx * tf;
-        double finalDY = dy - vy * tf;
+        double finalTotalTime = tf + MECHANICAL_SHOOT_DELAY;
+        double finalChassisDispX = (vx * finalTotalTime) + (0.5 * ax * finalTotalTime * finalTotalTime);
+        double finalChassisDispY = (vy * finalTotalTime) + (0.5 * ay * finalTotalTime * finalTotalTime);
+
+        double finalDX = dx - finalChassisDispX;
+        double finalDY = dy - finalChassisDispY;
 
         return new AimResult(
                 vDist,
