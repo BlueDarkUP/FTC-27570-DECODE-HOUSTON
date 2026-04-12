@@ -36,16 +36,16 @@ public class AutoAimTeleOp extends LinearOpMode {
     private AutoAimSubsystem autoAim;
 
     // ================= 常量配置 =================
-    private final double TARGET_X_WORLD = 133.0;
+    private final double TARGET_X_WORLD = 131.0;
     private final double TARGET_Y_WORLD = 134.0;
 
     private final double IDLE_VELOCITY = 3000.0;
 
     // 【修改点】引入线性映射的动态容差参数：转速越高，要求越严，容差越小
     private final double RPM_LOWER_BOUND = 3000.0; // 参考近战转速
-    private final double RPM_UPPER_BOUND = 5100.0; // 参考远射转速
-    private final double MAX_TOLERANCE = 250.0;    // 低速时的最大宽松容差 (RPM)
-    private final double MIN_TOLERANCE = 50.0;     // 高速时的最严苛容差 (RPM)
+    private final double RPM_UPPER_BOUND = 5050.0; // 参考远射转速
+    private final double MAX_TOLERANCE = 1000;    // 低速时的最大宽松容差 (RPM)
+    private final double MIN_TOLERANCE = 45;     // 高速时的最严苛容差 (RPM)etr
 
     private final double kP = 0.011;
     private final double kI = 0.0004;

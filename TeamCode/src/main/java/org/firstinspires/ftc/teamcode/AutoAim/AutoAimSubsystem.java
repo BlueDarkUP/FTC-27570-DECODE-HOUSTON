@@ -24,7 +24,7 @@ public class AutoAimSubsystem {
 
     public final double FIELD_OFFSET_X = 72.0;
     public final double FIELD_OFFSET_Y = 72.0;
-    public final double TURRET_OFFSET_FWD = -2.0;
+    public final double TURRET_OFFSET_FWD = -2.5;
     public final double TURRET_OFFSET_LEFT = 0.0;
 
     public final double TURRET_SOFT_LIMIT_CCW = 175.0;
@@ -35,24 +35,37 @@ public class AutoAimSubsystem {
     public final double TICKS_PER_DEGREE = TURRET_TICKS_PER_REV / 360.0;
 
     public final double STATIONARY_SPEED_LIMIT = 5.0;
-    public final double MAX_PHYSICAL_ACCEL = 1000;
-    public final double IMPACT_COOLDOWN_MS = 300.0;
+    public final double MAX_PHYSICAL_ACCEL = 10000;
+    public final double IMPACT_COOLDOWN_MS = 100;
     public final double ALPHA_NORMAL = 0.80;
     public final double ALPHA_IMPACT = 0.05;
 
-    public final double LL_FILTER_WEIGHT = 0.1;
-    public final double LL_MAX_TRUST_DISTANCE = 90.0;
+    public final double LL_FILTER_WEIGHT = 0.7;
+    public final double LL_MAX_TRUST_DISTANCE = 120.0;
 
-    private final double kP = 0.035;
-    private final double kI = 0.001;
-    private final double kD = 0.0015;
+    // ==========================================================
+    // === 第一段 PID 参数 (远距离：大开大合，追求速度，不管摩擦) ===
+    // ==========================================================
+    private final double STAGE_THRESHOLD = 14.0;
+    private final double kP_far = 0.05;
+    private final double kI_far = 0.00;
+    private final double kD_far = 0.0003;
 
-    private final double kS = 0.06;
+    // ==========================================================
+    // === 第二段 PID 参数 (近距离：精雕细琢，克服摩擦，防止超调) ===
+    // ==========================================================
+    private final double kP_near = 0.03;
+    private final double kI_near = 0.00005;
+    private final double kD_near = 0.000001;
 
-    private final double I_ZONE = 8.0;
+    private final double kS_near = 0.05;
+    private final double I_ZONE_near = 3.0;
+    private final double MAX_INTEGRAL_POWER = 0.08;
 
-    private final double MAX_INTEGRAL_POWER = 0.2;
-    private final double ERROR_TOLERANCE = 0.8;
+    // ==========================================================
+    // === 终点死区 ===
+    // ==========================================================
+    private final double ERROR_TOLERANCE = 0.5;
 
     private long lastLoopTime = 0;
     private double lastRawVxField = 0;
@@ -62,8 +75,12 @@ public class AutoAimSubsystem {
     private boolean isImpactDetected = false;
     private ElapsedTime impactTimer = new ElapsedTime();
 
+    // 双段 PID 状态变量
     private double integralSum = 0;
     private double lastError = 0;
+    private boolean wasInStage1 = false;
+    private String currentStageName = "IDLE";
+
     private ElapsedTime pidTimer = new ElapsedTime();
     private double currentTurretPower = 0;
 
@@ -122,7 +139,7 @@ public class AutoAimSubsystem {
         double rX = -robotPose.getX(DistanceUnit.INCH);
         double rY = robotPose.getY(DistanceUnit.INCH);
         double rH_Rad = robotPose.getHeading(AngleUnit.RADIANS);
-        double rVx = robotPose.getXVelocity(DistanceUnit.INCH);
+        double rVx = -robotPose.getXVelocity(DistanceUnit.INCH);
         double rVy = robotPose.getYVelocity(DistanceUnit.INCH);
         double rOmega = robotPose.getHeadingVelocity(AngleUnit.RADIANS);
         double speed = Math.hypot(rVx, rVy);
@@ -243,58 +260,72 @@ public class AutoAimSubsystem {
         if (turretMotor != null) {
             if (command.hasTarget) {
                 double error = command.pidErrorDeg;
+                double absError = Math.abs(error);
                 double dt = pidTimer.seconds();
                 if (dt == 0) dt = 0.001;
 
-                // 【核心优化 1】死区控制 (Deadband)
-                if (Math.abs(error) <= ERROR_TOLERANCE) {
-                    // 进入死区，视为到达目标，切断动力并清空积分
-                    turretMotor.setPower(0);
-                    currentTurretPower = 0;
+                double power = 0.0;
+
+                // ================= 双段 PID 核心逻辑接入 =================
+
+                // 【状态机 1：到达死区】
+                if (absError <= ERROR_TOLERANCE) {
+                    power = 0;
                     integralSum = 0;
-                } else {
-                    // 【核心优化 2】过零清空积分 (Zero-Crossing Clearing)
-                    // 如果这次的误差和上次的误差符号相反，说明我们刚刚越过了目标点
-                    if (Math.signum(error) != Math.signum(lastError)) {
+                    currentStageName = "【到达目标】";
+                    wasInStage1 = false;
+                }
+                // 【状态机 2：第一段 (远距离)】
+                else if (absError > STAGE_THRESHOLD) {
+                    currentStageName = "【第一段】(远距)";
+                    wasInStage1 = true;
+
+                    integralSum += error * dt;
+                    double derivative = (error - lastError) / dt;
+
+                    power = (kP_far * error) + (kI_far * integralSum) + (kD_far * derivative);
+                }
+                // 【状态机 3：第二段 (近距离精调)】
+                else {
+                    currentStageName = "【第二段】(近距)";
+
+                    // 阶段切换或穿过目标点时重置积分
+                    if (wasInStage1 || Math.signum(error) != Math.signum(lastError)) {
                         integralSum = 0;
+                        wasInStage1 = false;
                     }
 
-                    // 【核心优化 3】积分区间与限幅 (I-Zone & Anti-Windup)
-                    if (Math.abs(error) < I_ZONE) {
+                    if (absError < I_ZONE_near) {
                         integralSum += error * dt;
-                        // 限制积分累加的最大效果，防止积分饱和
-                        double maxISum = MAX_INTEGRAL_POWER / (kI == 0 ? 1 : kI);
+                        double maxISum = MAX_INTEGRAL_POWER / (kI_near == 0 ? 1 : kI_near);
                         integralSum = Math.max(-maxISum, Math.min(maxISum, integralSum));
                     } else {
-                        // 如果误差很大，根本不进行积分累加
                         integralSum = 0;
                     }
 
                     double derivative = (error - lastError) / dt;
+                    double pidPower = (kP_near * error) + (kI_near * integralSum) + (kD_near * derivative);
 
-                    // 计算基础 PID 动力
-                    double pidPower = (kP * error) + (kI * integralSum) + (kD * derivative);
+                    // 静摩擦力前馈
+                    double feedforward = Math.signum(error) * kS_near;
 
-                    // 【核心优化 4】静摩擦力前馈 (Static Friction Feedforward)
-                    // Math.signum(error) 会返回 1.0 (正误差) 或 -1.0 (负误差)
-                    double feedforward = Math.signum(error) * kS;
-
-                    // 最终动力 = PID动力 + 克服静摩擦力的最小动力
-                    double power = pidPower + feedforward;
-
-                    power = Math.max(-1.0, Math.min(1.0, power));
-
-                    turretMotor.setPower(power);
-                    currentTurretPower = power;
+                    power = pidPower + feedforward;
                 }
+
+                power = Math.max(-1.0, Math.min(1.0, power));
+                turretMotor.setPower(power);
+                currentTurretPower = power;
 
                 lastError = error;
                 pidTimer.reset();
+
             } else {
                 turretMotor.setPower(0);
                 currentTurretPower = 0;
                 integralSum = 0;
                 lastError = 0;
+                wasInStage1 = false;
+                currentStageName = "LOST/IDLE";
                 pidTimer.reset();
             }
         }
@@ -315,8 +346,9 @@ public class AutoAimSubsystem {
 
             double encDeg = turretMotor.getCurrentPosition() / TICKS_PER_DEGREE;
 
-            telemetry.addData("Turret Control", "Pow: %.2f | Err: %.1f° | Tgt: %.1f°",
-                    currentTurretPower, command.pidErrorDeg, (encDeg + command.pidErrorDeg));
+            // 新增了阶段名称的输出，方便在主 TeleOp 中随时监控云台状态
+            telemetry.addData("Turret Control", "%s Pow: %.2f | Err: %.1f° | Tgt: %.1f°",
+                    currentStageName, currentTurretPower, command.pidErrorDeg, (encDeg + command.pidErrorDeg));
 
             telemetry.addData("Turret Angle", "Encoder: %.1f° | RelToFront: %.1f°",
                     encDeg, AngleUnit.normalizeDegrees(encDeg + TURRET_START_OFFSET_DEG));

@@ -14,25 +14,25 @@ public class AimCalculator {
     public static double P1_DIST = 21.0;
     public static double P1_RPM = 3000;
     public static double P1_PITCH = 0.35;
-    public static double P1_TIME = 0.15;
+    public static double P1_TIME = 0.5;
 
     // 数据点 2：中近
     public static double P2_DIST = 60.0;
-    public static double P2_RPM = 3550;
+    public static double P2_RPM = 3430;
     public static double P2_PITCH = 0.7;
-    public static double P2_TIME = 0.35;
+    public static double P2_TIME = 0.6;
 
     // 数据点 3：中远
     public static double P3_DIST = 89.2;
-    public static double P3_RPM = 4100;
+    public static double P3_RPM = 4000;
     public static double P3_PITCH = 1;
-    public static double P3_TIME = 0.55;
+    public static double P3_TIME = 0.7;
 
     // 数据点 4：最远
     public static double P4_DIST = 150.0;
-    public static double P4_RPM = 5100;
+    public static double P4_RPM = 5050;
     public static double P4_PITCH = 1;
-    public static double P4_TIME = 0.90;
+    public static double P4_TIME = 0.9;
 
     /**
      * 每次解算时动态获取最新的 Dashboard 参数
