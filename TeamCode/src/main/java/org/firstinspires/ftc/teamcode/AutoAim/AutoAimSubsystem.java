@@ -7,13 +7,14 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
-
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.teamcode.Driver.EchoLapse.PinpointPoseProvider;
+
+import java.util.List;
 
 @Config
 public class AutoAimSubsystem {
@@ -29,14 +30,13 @@ public class AutoAimSubsystem {
     // ==========================================================
     public static double FIELD_OFFSET_X = 72.0;
     public static double FIELD_OFFSET_Y = 72.0;
-    public static double TURRET_OFFSET_FWD = -2.5;
+    public static double TURRET_OFFSET_FWD = -2;
     public static double TURRET_OFFSET_LEFT = 0.0;
 
     public static double TURRET_SOFT_LIMIT_CCW = 175.0;
     public static double TURRET_SOFT_LIMIT_CW = -210.0;
     public static double TURRET_START_OFFSET_DEG = 0;
 
-    // 这两个一般是固定的硬件参数，但也暴露出来方便确认
     public static double TURRET_TICKS_PER_REV = 32798;
     public static double TICKS_PER_DEGREE = 32798 / 360.0;
 
@@ -45,29 +45,39 @@ public class AutoAimSubsystem {
     // ==========================================================
     public static double MAX_PHYSICAL_ACCEL = 10000;
     public static double IMPACT_COOLDOWN_MS = 100;
-    public static double ALPHA_NORMAL = 0.80;
+
+    public static double ALPHA_NORMAL = 0.55;
     public static double ALPHA_IMPACT = 0.05;
 
-    public static double LL_BASE_FILTER_WEIGHT = 0.7;
-    public static double LL_MAX_TRUST_DISTANCE = 120.0;
+    // -- 高阶视觉参数：动态协方差与过滤器 --
+    public static double LL_MAX_TRUST_SPEED = 15.0;
+    public static double LL_MAX_TRUST_DISTANCE = 100.0;
+    public static double LL_MAX_STALENESS_MS = 100.0;
 
-    // 目标的有效击打宽度(英寸)，用于动态计算允许的角度误差
-    public static double TARGET_HITBOX_WIDTH_INCHES = 8.0;
-    // 保底最大角度误差，防止离得太近时容差过大
-    public static double MAX_AIM_ANGLE_TOLERANCE = 5.5;
+    // 多 Tag 锁定时的超高置信度权重
+    public static double LL_MULTI_TAG_POS_WEIGHT = 0.8;
+    public static double LL_MULTI_TAG_HEADING_WEIGHT = 0.1;
+    // 单 Tag 锁定时的基础置信度权重 (会随距离衰减)
+    public static double LL_SINGLE_TAG_BASE_POS_WEIGHT = 0.6;
+    public static double LL_SINGLE_TAG_BASE_HEADING_WEIGHT = 0.02;
+    // 单 Tag 开始信任衰减的最大距离 (米)
+    public static double LL_MAX_SINGLE_TAG_DIST_M = 4.0;
+
+    // 防瞬移拦截距离(英寸)：如果一帧视觉误差过大，直接丢弃，防止底盘抽搐
+    public static double LL_MAX_TELEPORT_INCHES = 15.0;
+
+    public static double TARGET_HITBOX_WIDTH_INCHES = 16;
+    public static double MAX_AIM_ANGLE_TOLERANCE = 8.5;
 
     // ==========================================================
     // === 【Dashboard 调参区】动力学前馈控制 (Feed-Forward) ===
     // ==========================================================
-    // 云台电机的速度前馈系数：让云台转动 1度/秒 需要多少电机 Power？
-    public static double kV_TURRET = 0.00058;
-    // 云台电机的加速度前馈系数：克服云台惯性
-    public static double kA_TURRET = 0.00000;
+    public static double kV_TURRET = 0.0005;
+    public static double kA_TURRET = 0.0004;
 
     // ==========================================================
     // === 【Dashboard 调参区】双段 PID 控制参数 ===
     // ==========================================================
-    // 切换阈值：误差大于此值用第一段，小于此值用第二段
     public static double STAGE_THRESHOLD = 14.0;
 
     public static double kP_far = 0.05;
@@ -75,14 +85,13 @@ public class AutoAimSubsystem {
     public static double kD_far = 0.0003;
 
     public static double kP_near = 0.03;
-    public static double kI_near = 0.00005;
+    public static double kI_near = 0.00;
     public static double kD_near = 0.000001;
-
     public static double kS_near = 0.05;
     public static double I_ZONE_near = 3.0;
+
     public static double MAX_INTEGRAL_POWER = 0.08;
     public static double ERROR_TOLERANCE = 0.3;
-
 
     // ==========================================================
     // === 内部状态变量 (不需要在 Dashboard 调试) ===
@@ -95,20 +104,49 @@ public class AutoAimSubsystem {
     private double lastSmoothAxField = 0;
     private double lastSmoothAyField = 0;
     private double lastROmegaDeg = 0;
-
     private boolean isImpactDetected = false;
     private ElapsedTime impactTimer = new ElapsedTime();
-
     private double integralSum = 0;
     private double lastError = 0;
     private boolean wasInStage1 = false;
     private String currentStageName = "IDLE";
-
     private ElapsedTime pidTimer = new ElapsedTime();
     private double currentTurretPower = 0;
-
     private boolean isLLActiveThisLoop = false;
     private double dynamicToleranceDeg = 2.0;
+
+    // 去重保护
+    private double lastProcessedBotposeX = -9999.0;
+    private double lastProcessedBotposeY = -9999.0;
+
+    // ==========================================================
+    // === 虚拟偏移层 (Virtual Offset) ===
+    // ==========================================================
+    // 永远不覆写底盘里程计，仅维护纯软件坐标偏移量
+    private double visionOffsetX = 0.0;
+    private double visionOffsetY = 0.0;
+    private double visionOffsetH_Rad = 0.0;
+
+    // ==========================================================
+    // === 位姿历史队列 (Pose Buffer / Time Machine) ===
+    // ==========================================================
+    private static final int POSE_BUFFER_SIZE = 100;
+    private OdoRecord[] poseBuffer = new OdoRecord[POSE_BUFFER_SIZE];
+    private int poseBufferIndex = 0;
+
+    private static class OdoRecord {
+        long timestampNano;
+        double rawX;
+        double rawY;
+        double rawH_Rad;
+
+        public OdoRecord(long t, double x, double y, double h) {
+            this.timestampNano = t;
+            this.rawX = x;
+            this.rawY = y;
+            this.rawH_Rad = h;
+        }
+    }
 
     public static class TurretCommand {
         public boolean hasTarget = false;
@@ -149,80 +187,155 @@ public class AutoAimSubsystem {
         } catch (Exception e) {
             telemetry.addLine("[FATAL] Turret Motor missing.");
         }
+
+        // 初始化缓冲区
+        for(int i = 0; i < POSE_BUFFER_SIZE; i++) {
+            poseBuffer[i] = new OdoRecord(0, 0, 0, 0);
+        }
+
         pidTimer.reset();
+    }
+
+    // 从时光机队列中寻找最接近指定时间戳的历史记录
+    private OdoRecord getHistoricalPose(long targetTimeNano) {
+        long minDiff = Long.MAX_VALUE;
+        OdoRecord bestRecord = poseBuffer[0];
+
+        for (int i = 0; i < POSE_BUFFER_SIZE; i++) {
+            if (poseBuffer[i].timestampNano == 0) continue;
+            long diff = Math.abs(poseBuffer[i].timestampNano - targetTimeNano);
+            if (diff < minDiff) {
+                minDiff = diff;
+                bestRecord = poseBuffer[i];
+            }
+        }
+        return bestRecord;
     }
 
     public TurretCommand update(double targetX, double targetY) {
         TurretCommand command = new TurretCommand();
         if (robotPose == null) return command;
 
-        if (lastLoopTime == 0) lastLoopTime = System.nanoTime();
+        long currentNanoTime = System.nanoTime();
+        if (lastLoopTime == 0) lastLoopTime = currentNanoTime;
 
         robotPose.update();
         if (turretPose != null) turretPose.update();
 
-        double rX = -robotPose.getX(DistanceUnit.INCH);
-        double rY = robotPose.getY(DistanceUnit.INCH);
-        double rH_Rad = robotPose.getHeading(AngleUnit.RADIANS);
+        // 提取 Pinpoint 最纯粹的原始状态
+        double rawX = -robotPose.getX(DistanceUnit.INCH);
+        double rawY = robotPose.getY(DistanceUnit.INCH);
+        double rawH_Rad = robotPose.getHeading(AngleUnit.RADIANS);
+
+        // 速度可以直接取，速度属于一阶导，不受绝对位置平移的影响
         double rVx = -robotPose.getXVelocity(DistanceUnit.INCH);
         double rVy = robotPose.getYVelocity(DistanceUnit.INCH);
-
         double rOmegaRad = robotPose.getHeadingVelocity(AngleUnit.RADIANS);
         double rOmegaDeg = Math.toDegrees(rOmegaRad);
-
         double speed = Math.hypot(rVx, rVy);
+
+        // 将当前纯净位姿推入历史队列
+        poseBuffer[poseBufferIndex].timestampNano = currentNanoTime;
+        poseBuffer[poseBufferIndex].rawX = rawX;
+        poseBuffer[poseBufferIndex].rawY = rawY;
+        poseBuffer[poseBufferIndex].rawH_Rad = rawH_Rad;
+        poseBufferIndex = (poseBufferIndex + 1) % POSE_BUFFER_SIZE;
+
+        // 【应用虚拟偏移量】生成当前真正的世界坐标
+        double rX = rawX + visionOffsetX;
+        double rY = rawY + visionOffsetY;
+        double rH_Rad = AngleUnit.normalizeRadians(rawH_Rad + visionOffsetH_Rad);
+
         double chassisDistToTarget = Math.hypot(targetX - rX, targetY - rY);
 
-        double dynamicLLWeight = LL_BASE_FILTER_WEIGHT;
-        if (speed > 5.0) {
-            dynamicLLWeight = LL_BASE_FILTER_WEIGHT * (5.0 / speed);
-        }
-
+        // ==========================================================
+        // === Limelight 视觉矫正核心 (Time Machine + Dynamic Covariance) ===
+        // ==========================================================
         isLLActiveThisLoop = false;
-        if (ll != null) {
+
+        if (ll != null && speed < LL_MAX_TRUST_SPEED) {
             LLResult result = ll.getLatestResult();
-            if (result != null && result.isValid() && chassisDistToTarget < LL_MAX_TRUST_DISTANCE) {
-                Pose3D botpose = result.getBotpose();
+
+            if (result != null && result.isValid() && chassisDistToTarget < LL_MAX_TRUST_DISTANCE && result.getStaleness() < LL_MAX_STALENESS_MS) {
+                Pose3D botpose = result.getBotpose(); // 弃用有Bug的MT2，换回稳健的MT1
                 double llRawX_Meters = botpose.getPosition().x;
                 double llRawY_Meters = botpose.getPosition().y;
-                double llRawYaw_Rad = botpose.getOrientation().getYaw(AngleUnit.RADIANS);
 
-                double targetWorldX_Inches = (llRawY_Meters * 39.3701) + FIELD_OFFSET_X;
-                double targetWorldY_Inches = (-llRawX_Meters * 39.3701) + FIELD_OFFSET_Y;
-                double mappedHeading_Rad = AngleUnit.normalizeRadians(llRawYaw_Rad + Math.PI);
+                if (llRawX_Meters != lastProcessedBotposeX || llRawY_Meters != lastProcessedBotposeY) {
+                    lastProcessedBotposeX = llRawX_Meters;
+                    lastProcessedBotposeY = llRawY_Meters;
 
-                double latency = (result.getCaptureLatency() + result.getTargetingLatency()) / 1000.0;
+                    double llRawYaw_Rad = botpose.getOrientation().getYaw(AngleUnit.RADIANS);
+                    double targetWorldX_Inches = (llRawY_Meters * 39.3701) + FIELD_OFFSET_X;
+                    double targetWorldY_Inches = (-llRawX_Meters * 39.3701) + FIELD_OFFSET_Y;
+                    double targetWorldH_Rad = AngleUnit.normalizeRadians(llRawYaw_Rad + Math.PI);
 
-                Pose2D targetLLPose = new Pose2D(DistanceUnit.INCH,
-                        targetWorldX_Inches + (rVx * latency),
-                        targetWorldY_Inches + (rVy * latency),
-                        AngleUnit.RADIANS, mappedHeading_Rad);
+                    // 1. 获取延迟，穿越回历史时刻
+                    long totalLatencyNano = (long) ((result.getCaptureLatency() + result.getTargetingLatency()) * 1_000_000.0);
+                    long visionTimestampNano = currentNanoTime - totalLatencyNano;
 
-                double currentOdoX = -robotPose.getX(DistanceUnit.INCH);
-                double currentOdoY = robotPose.getY(DistanceUnit.INCH);
-                double currentOdoH = robotPose.getHeading(AngleUnit.RADIANS);
+                    OdoRecord histRawOdo = getHistoricalPose(visionTimestampNano);
 
-                double newX = currentOdoX + (targetLLPose.getX(DistanceUnit.INCH) - currentOdoX) * dynamicLLWeight;
-                double newY = currentOdoY + (targetLLPose.getY(DistanceUnit.INCH) - currentOdoY) * dynamicLLWeight;
+                    // 计算出“历史拍摄瞬间”我们【自认为】的真实世界坐标
+                    double histRealX = histRawOdo.rawX + visionOffsetX;
+                    double histRealY = histRawOdo.rawY + visionOffsetY;
+                    double histRealH = AngleUnit.normalizeRadians(histRawOdo.rawH_Rad + visionOffsetH_Rad);
 
-                double angleDiff = AngleUnit.normalizeRadians(targetLLPose.getHeading(AngleUnit.RADIANS) - currentOdoH);
-                double newH = AngleUnit.normalizeRadians(currentOdoH + (angleDiff * dynamicLLWeight));
+                    // 2. 计算纯粹的坐标误差 (Delta)
+                    double errX = targetWorldX_Inches - histRealX;
+                    double errY = targetWorldY_Inches - histRealY;
+                    double errH = AngleUnit.normalizeRadians(targetWorldH_Rad - histRealH);
 
-                robotPose.setPose(new Pose2D(DistanceUnit.INCH, newX, newY, AngleUnit.RADIANS, newH));
-                isLLActiveThisLoop = true;
+                    // 3. 动态协方差计算 (动态信任权重)
+                    int tagCount = result.getFiducialResults().size();
+                    double dynamicWeightPos = 0;
+                    double dynamicWeightHeading = 0;
+
+                    if (tagCount >= 2) {
+                        dynamicWeightPos = LL_MULTI_TAG_POS_WEIGHT;
+                        dynamicWeightHeading = LL_MULTI_TAG_HEADING_WEIGHT;
+                    } else if (tagCount == 1) {
+                        double distZ = botpose.getPosition().z;
+                        // 二次函数平滑衰减权重，超出最大距离归零
+                        double trustFactor = Math.max(0.0, 1.0 - (distZ * distZ) / (LL_MAX_SINGLE_TAG_DIST_M * LL_MAX_SINGLE_TAG_DIST_M));
+                        dynamicWeightPos = LL_SINGLE_TAG_BASE_POS_WEIGHT * trustFactor;
+                        dynamicWeightHeading = LL_SINGLE_TAG_BASE_HEADING_WEIGHT * trustFactor;
+                    }
+
+                    // 4. 防瞬移刚性过滤
+                    double jumpDist = Math.hypot(errX, errY);
+                    if (jumpDist < LL_MAX_TELEPORT_INCHES) {
+                        // 缓慢累加到虚拟偏移层上，不碰底层里程计
+                        visionOffsetX += errX * dynamicWeightPos;
+                        visionOffsetY += errY * dynamicWeightPos;
+                        visionOffsetH_Rad = AngleUnit.normalizeRadians(visionOffsetH_Rad + errH * dynamicWeightHeading);
+
+                        // 由于偏移层被修改，需立刻刷新当帧使用的真实坐标，用于本帧后续解算
+                        rX = rawX + visionOffsetX;
+                        rY = rawY + visionOffsetY;
+                        rH_Rad = AngleUnit.normalizeRadians(rawH_Rad + visionOffsetH_Rad);
+
+                        isLLActiveThisLoop = true;
+                    } else {
+                        telemetry.addData("[LL Core]", "REJECTED! Teleportation (%.1f in) detected.", jumpDist);
+                    }
+                }
             }
         }
+
+        // ==========================================================
 
         double cosH = Math.cos(rH_Rad);
         double sinH = Math.sin(rH_Rad);
         double turretX = rX + (TURRET_OFFSET_FWD * (-sinH)) + (TURRET_OFFSET_LEFT * (-cosH));
         double turretY = rY + (TURRET_OFFSET_FWD * ( cosH)) + (TURRET_OFFSET_LEFT * (-sinH));
+
         double tanVx = (TURRET_OFFSET_FWD * -cosH * rOmegaRad) + (TURRET_OFFSET_LEFT * sinH * rOmegaRad);
         double tanVy = (TURRET_OFFSET_FWD * -sinH * rOmegaRad) + (TURRET_OFFSET_LEFT * -cosH * rOmegaRad);
         double turretVx = rVx + tanVx;
         double turretVy = rVy + tanVy;
 
-        double dtNano = (System.nanoTime() - lastLoopTime);
+        double dtNano = (currentNanoTime - lastLoopTime);
         double dtSec = dtNano / 1.0E9;
         if(dtSec < 0.001) dtSec = 0.001;
 
@@ -250,6 +363,17 @@ public class AutoAimSubsystem {
             isImpactDetected = false;
         }
 
+        if (Math.hypot(turretVx, turretVy) < 1.5) {
+            turretVx = 0;
+            turretVy = 0;
+            currentAx = 0;
+            currentAy = 0;
+            lastSmoothVxField = 0;
+            lastSmoothVyField = 0;
+            lastSmoothAxField = 0;
+            lastSmoothAyField = 0;
+        }
+
         double alpha = isImpactDetected ? ALPHA_IMPACT : ALPHA_NORMAL;
         double smoothVx = lastSmoothVxField * (1.0 - alpha) + turretVx * alpha;
         double smoothVy = lastSmoothVyField * (1.0 - alpha) + turretVy * alpha;
@@ -259,7 +383,7 @@ public class AutoAimSubsystem {
 
         lastSmoothVxField = smoothVx;
         lastSmoothVyField = smoothVy;
-        lastLoopTime = System.nanoTime();
+        lastLoopTime = currentNanoTime;
 
         AimCalculator.AimResult aim = AimCalculator.solveAim(
                 turretX, turretY, smoothVx, smoothVy, lastSmoothAxField, lastSmoothAyField, targetX, targetY
@@ -279,7 +403,7 @@ public class AutoAimSubsystem {
             command.targetDistance = distanceToTarget;
 
             double targetAbsHeading = aim.algYaw - 90.0;
-            double currentChassisHeading = robotPose.getHeading(AngleUnit.DEGREES);
+            double currentChassisHeading = Math.toDegrees(rH_Rad);
 
             double encoderDeg = turretMotor.getCurrentPosition() / TICKS_PER_DEGREE;
             double currentTurretRelDegToChassis = encoderDeg + TURRET_START_OFFSET_DEG;
@@ -386,7 +510,7 @@ public class AutoAimSubsystem {
     private void printTelemetry(AimCalculator.AimResult aim, TurretCommand command, double rX, double rY, double targetX, double targetY, double ffPower) {
         telemetry.addData("AutoAim Status", isImpactDetected ? "[! IMPACT !]" : "[ OK ]");
         telemetry.addData("Chassis Pos", "X:%.1f  Y:%.1f", rX, rY);
-        telemetry.addData("Vision Filter", isLLActiveThisLoop ? "ACTIVE (Moving/Stationary Fusion)" : "DISABLED (Too far)");
+        telemetry.addData("Vision Filter", isLLActiveThisLoop ? "ACTIVE (Time-Machine Sync)" : "DISABLED (Speed/Dist)");
 
         if(aim != null && command.hasTarget) {
             telemetry.addData("Target Locked", "WorldX:%.0f WorldY:%.0f | Dist: %.1f in", targetX, targetY, command.targetDistance);
@@ -405,11 +529,25 @@ public class AutoAimSubsystem {
         }
     }
 
+    // 更新：重新设定坐标时，硬件和虚拟层都要清理，防止幽灵数据
     public void setInitialPose(Pose2D pose) {
         if (robotPose != null) {
             robotPose.setPose(pose);
             robotPose.update();
-            telemetry.addData("[System]", "Odometry Pose Overridden to X: " + (-pose.getX(DistanceUnit.INCH)));
+
+            // 清理软件虚拟偏移
+            visionOffsetX = 0;
+            visionOffsetY = 0;
+            visionOffsetH_Rad = 0;
+
+            // 清理时光机缓存，防止切坐标时发生历史污染
+            for(int i = 0; i < POSE_BUFFER_SIZE; i++) {
+                if (poseBuffer[i] != null) {
+                    poseBuffer[i].timestampNano = 0;
+                }
+            }
+
+            telemetry.addData("[System]", "Odometry & Offsets Fully Reset");
         }
     }
 }

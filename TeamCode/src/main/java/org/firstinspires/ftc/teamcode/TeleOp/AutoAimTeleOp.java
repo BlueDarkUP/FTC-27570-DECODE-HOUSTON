@@ -36,8 +36,8 @@ public class AutoAimTeleOp extends LinearOpMode {
     private AutoAimSubsystem autoAim;
 
     // ================= 常量配置 =================
-    private final double TARGET_X_WORLD = 131.0;
-    private final double TARGET_Y_WORLD = 134.0;
+    private final double TARGET_X_WORLD = 136.0;
+    private final double TARGET_Y_WORLD = 135.0;
 
     private final double IDLE_VELOCITY = 3000.0;
 
