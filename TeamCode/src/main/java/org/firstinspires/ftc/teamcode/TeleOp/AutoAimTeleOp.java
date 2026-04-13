@@ -134,7 +134,7 @@ public class AutoAimTeleOp extends LinearOpMode {
         autoAim.setInitialPose(startPose);
 
         while (opModeInInit()) {
-            AutoAimSubsystem.TurretCommand aimCommand = autoAim.update(TARGET_X_WORLD, TARGET_Y_WORLD);
+            AutoAimSubsystem.TurretCommand aimCommand = autoAim.update(TARGET_X_WORLD, TARGET_Y_WORLD, false);
             if (aimCommand.hasTarget) {
                 setPitchServos(aimCommand.targetPitch);
             }
@@ -155,17 +155,18 @@ public class AutoAimTeleOp extends LinearOpMode {
             rf.setPower((y - x - rx) / denominator);
             rb.setPower((y + x - rx) / denominator);
 
-            AutoAimSubsystem.TurretCommand aimCommand = autoAim.update(TARGET_X_WORLD, TARGET_Y_WORLD);
-
-            if (aimCommand.hasTarget) {
-                setPitchServos(aimCommand.targetPitch);
-            }
-
             boolean currentCircleState = gamepad1.b;
             if (currentCircleState && !lastCircleState) {
                 isShootingMode = !isShootingMode;
             }
             lastCircleState = currentCircleState;
+
+            // 将 isShootingMode 传入底层，非射击模式下将自动切断 kA，消除闲置时的震荡
+            AutoAimSubsystem.TurretCommand aimCommand = autoAim.update(TARGET_X_WORLD, TARGET_Y_WORLD, isShootingMode);
+
+            if (aimCommand.hasTarget) {
+                setPitchServos(aimCommand.targetPitch);
+            }
 
             double targetVelocityRPM = IDLE_VELOCITY;
             if (isShootingMode) {
@@ -192,26 +193,20 @@ public class AutoAimTeleOp extends LinearOpMode {
             double currentRPM = (currentVelTPS * 60.0) / TICKS_PER_REV;
             double errorRPM = targetVelocityRPM - currentRPM;
 
-            // ================= 新增：飞轮迟滞与状态机逻辑 =================
             if (!isShootingMode) {
-                // 不在射击模式时，重置飞轮就绪状态
                 isFlywheelReady = false;
             } else {
                 if (!isFlywheelReady) {
-                    // 【蓄力阶段】必须非常接近目标转速才能首次射击（允许少量误差如100RPM防卡死）
                     if (currentRPM >= targetVelocityRPM - SPOOL_UP_TOLERANCE) {
                         isFlywheelReady = true;
                     }
                 } else {
-                    // 【连发阶段】一旦开始射击，允许转速下掉，只要掉速不超过动态容差即可
                     if (currentRPM < targetVelocityRPM - dynamicTolerance) {
-                        isFlywheelReady = false; // 掉速严重，强制停止推弹重新蓄力
+                        isFlywheelReady = false;
                     }
                 }
             }
-            // 使用状态机结果替代原先的直接判断
             boolean rpmOK = isFlywheelReady;
-            // ==============================================================
 
             double dt = timer.seconds();
             timer.reset();
@@ -316,7 +311,6 @@ public class AutoAimTeleOp extends LinearOpMode {
 
             wasUnwinding = aimCommand.isUnwinding;
 
-            // [八] 遥测输出
             telemetry.addData("当前模式", isShootingMode ? "[ 发射模式 ]" : "[ 怠速模式 ]");
             telemetry.addData("瞬态接管状态", activeBoost);
             if (aimCommand.hasTarget) {
@@ -326,7 +320,6 @@ public class AutoAimTeleOp extends LinearOpMode {
             telemetry.addData("飞轮目标 RPM", targetVelocityRPM);
             telemetry.addData("RPM 误差", errorRPM);
 
-            // 优化了遥测信息，方便驾驶员知道当前飞轮是处于等待状态还是射击状态
             telemetry.addData("飞轮状态", isFlywheelReady ? "✅ 已满转 (允许掉速射击)" : "⏳ 蓄力中 (等待达到满转)...");
             telemetry.addData("允许最大掉速 (容差)", "-%.1f RPM", dynamicTolerance);
 

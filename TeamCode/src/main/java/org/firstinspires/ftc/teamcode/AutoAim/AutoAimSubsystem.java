@@ -234,7 +234,7 @@ public class AutoAimSubsystem {
         }
     }
 
-    public TurretCommand update(double targetX, double targetY) {
+    public TurretCommand update(double targetX, double targetY, boolean isShootingMode) {
         TurretCommand command = new TurretCommand();
         if (robotPose == null) return command;
 
@@ -452,8 +452,11 @@ public class AutoAimSubsystem {
             double requiredOmegaFromTranslation = Math.toDegrees(tangentialVelocity / Math.sqrt(distSq));
 
             double totalRequiredRelativeOmega = requiredOmegaFromRotation + requiredOmegaFromTranslation;
+
             double requiredAlphaFromRotation = -currentAlphaDeg;
-            feedforwardPower = (totalRequiredRelativeOmega * kV_TURRET) + (requiredAlphaFromRotation * kA_TURRET);
+            double active_kA_TURRET = isShootingMode ? kA_TURRET : 0.0;
+
+            feedforwardPower = (totalRequiredRelativeOmega * kV_TURRET) + (requiredAlphaFromRotation * active_kA_TURRET);
         }
 
         if (turretMotor != null) {
@@ -535,12 +538,12 @@ public class AutoAimSubsystem {
             }
         }
 
-        printTelemetry(aim, command, rX, rY, targetX, targetY, feedforwardPower);
+        printTelemetry(aim, command, rX, rY, targetX, targetY, feedforwardPower, isShootingMode);
 
         return command;
     }
 
-    private void printTelemetry(AimCalculator.AimResult aim, TurretCommand command, double rX, double rY, double targetX, double targetY, double ffPower) {
+    private void printTelemetry(AimCalculator.AimResult aim, TurretCommand command, double rX, double rY, double targetX, double targetY, double ffPower, boolean isShootingMode) {
         telemetry.addData("AutoAim Status", isImpactDetected ? "[! IMPACT !]" : "[ OK ]");
         telemetry.addData("Chassis Pos", "X:%.1f  Y:%.1f", rX, rY);
         telemetry.addData("Vision Filter", isLLActiveThisLoop ? "ACTIVE (Time-Machine Sync)" : "DISABLED (Speed/Dist)");
@@ -550,6 +553,7 @@ public class AutoAimSubsystem {
             telemetry.addData("Aim Command", "RPM: %.0f | Pitch: %.2f", aim.rpm, aim.pitch);
 
             telemetry.addData("Dynamic Filters", "kA_Alpha: %.2f | D_Alpha: %.2f", currentActiveKaAlpha, currentActiveDAlpha);
+            telemetry.addData("kA (Alpha FF) Status", isShootingMode ? "ACTIVE" : "DISABLED (Idle)");
 
             double encDeg = turretMotor.getCurrentPosition() / TICKS_PER_DEGREE;
 
