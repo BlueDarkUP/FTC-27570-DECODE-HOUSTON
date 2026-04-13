@@ -30,7 +30,7 @@ public class AutoAimSubsystem {
     // ==========================================================
     public static double FIELD_OFFSET_X = 72.0;
     public static double FIELD_OFFSET_Y = 72.0;
-    public static double TURRET_OFFSET_FWD = -2;
+    public static double TURRET_OFFSET_FWD = -1.22;
     public static double TURRET_OFFSET_LEFT = 0.0;
 
     public static double TURRET_SOFT_LIMIT_CCW = 175.0;

@@ -45,7 +45,10 @@ public class AutoAimTeleOp extends LinearOpMode {
     private final double RPM_LOWER_BOUND = 3000.0;
     private final double RPM_UPPER_BOUND = 5050.0;
     private final double MAX_TOLERANCE = 1000;
-    private final double MIN_TOLERANCE = 45;
+    private final double MIN_TOLERANCE = 1000;
+
+    // 新增：首次蓄力完成的极小容差（必须达到目标转速 - 100 才能首次开火）
+    private final double SPOOL_UP_TOLERANCE = 100.0;
 
     private final double kP = 0.011;
     private final double kI = 0.0004;
@@ -64,6 +67,9 @@ public class AutoAimTeleOp extends LinearOpMode {
 
     private boolean isShootingMode = false;
     private boolean lastCircleState = false;
+
+    // 新增：记录飞轮是否已经蓄力完成的状态标志
+    private boolean isFlywheelReady = false;
 
     private double intakeBrakeReleaseTime = 0.0;
 
@@ -185,7 +191,27 @@ public class AutoAimTeleOp extends LinearOpMode {
             double targetVelTPS = (targetVelocityRPM * TICKS_PER_REV) / 60.0;
             double currentRPM = (currentVelTPS * 60.0) / TICKS_PER_REV;
             double errorRPM = targetVelocityRPM - currentRPM;
-            boolean rpmOK = Math.abs(errorRPM) <= dynamicTolerance;
+
+            // ================= 新增：飞轮迟滞与状态机逻辑 =================
+            if (!isShootingMode) {
+                // 不在射击模式时，重置飞轮就绪状态
+                isFlywheelReady = false;
+            } else {
+                if (!isFlywheelReady) {
+                    // 【蓄力阶段】必须非常接近目标转速才能首次射击（允许少量误差如100RPM防卡死）
+                    if (currentRPM >= targetVelocityRPM - SPOOL_UP_TOLERANCE) {
+                        isFlywheelReady = true;
+                    }
+                } else {
+                    // 【连发阶段】一旦开始射击，允许转速下掉，只要掉速不超过动态容差即可
+                    if (currentRPM < targetVelocityRPM - dynamicTolerance) {
+                        isFlywheelReady = false; // 掉速严重，强制停止推弹重新蓄力
+                    }
+                }
+            }
+            // 使用状态机结果替代原先的直接判断
+            boolean rpmOK = isFlywheelReady;
+            // ==============================================================
 
             double dt = timer.seconds();
             timer.reset();
@@ -220,7 +246,6 @@ public class AutoAimTeleOp extends LinearOpMode {
                     activeBoost = "Bang-Bang (极速补电)";
                 }
             }
-
 
             if (targetVelocityRPM <= 0) {
                 power = 0;
@@ -260,7 +285,7 @@ public class AutoAimTeleOp extends LinearOpMode {
                         if (!aimCommand.hasTarget) {
                             telemetry.addData("🔴 发射系统", "等待目标...");
                         } else if (!rpmOK) {
-                            telemetry.addData("🔴 发射系统", "飞轮调速中 (RPM未达标)...");
+                            telemetry.addData("🔴 发射系统", "飞轮蓄力调速中 (等待达到满转)...");
                         } else if (!aimCommand.isAimLocked) {
                             telemetry.addData("🔴 发射系统", "云台动态追瞄中 (等待角度容差锁定)...");
                         }
@@ -293,15 +318,19 @@ public class AutoAimTeleOp extends LinearOpMode {
 
             // [八] 遥测输出
             telemetry.addData("当前模式", isShootingMode ? "[ 发射模式 ]" : "[ 怠速模式 ]");
-            telemetry.addData("瞬态接管状态", activeBoost); // >>> 观察是否触发 Bang-Bang
+            telemetry.addData("瞬态接管状态", activeBoost);
             if (aimCommand.hasTarget) {
                 telemetry.addData("Pitch 舵机", "LP: %.3f | RP: %.3f", LP.getPosition(), RP.getPosition());
             }
             telemetry.addData("飞轮当前 RPM", currentRPM);
             telemetry.addData("飞轮目标 RPM", targetVelocityRPM);
             telemetry.addData("RPM 误差", errorRPM);
-            telemetry.addData("动态容差阈值", "±%.1f", dynamicTolerance);
-            telemetry.addData("极速补电触发线", "> %.1f", bangBangThreshold); // >>> 新增遥测，方便对比误差和阈值
+
+            // 优化了遥测信息，方便驾驶员知道当前飞轮是处于等待状态还是射击状态
+            telemetry.addData("飞轮状态", isFlywheelReady ? "✅ 已满转 (允许掉速射击)" : "⏳ 蓄力中 (等待达到满转)...");
+            telemetry.addData("允许最大掉速 (容差)", "-%.1f RPM", dynamicTolerance);
+
+            telemetry.addData("极速补电触发线", "> %.1f", bangBangThreshold);
             telemetry.addData("当前飞轮动力分配", "%.2f", power);
             telemetry.addData("Intake 电流 (A)", "%.2f", intakeCurrent);
 
