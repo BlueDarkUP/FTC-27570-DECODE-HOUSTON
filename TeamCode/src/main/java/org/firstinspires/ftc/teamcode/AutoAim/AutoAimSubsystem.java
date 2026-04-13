@@ -25,9 +25,6 @@ public class AutoAimSubsystem {
     private Telemetry telemetry;
     private DcMotorEx turretMotor;
 
-    // ==========================================================
-    // === 【Dashboard 调参区】基础物理结构与坐标映射 ===
-    // ==========================================================
     public static double FIELD_OFFSET_X = 72.0;
     public static double FIELD_OFFSET_Y = 72.0;
     public static double TURRET_OFFSET_FWD = -1.22;
@@ -40,62 +37,57 @@ public class AutoAimSubsystem {
     public static double TURRET_TICKS_PER_REV = 32798;
     public static double TICKS_PER_DEGREE = 32798 / 360.0;
 
-    // ==========================================================
-    // === 【Dashboard 调参区】视觉与撞击过滤系统 ===
-    // ==========================================================
     public static double MAX_PHYSICAL_ACCEL = 10000;
     public static double IMPACT_COOLDOWN_MS = 100;
 
     public static double ALPHA_NORMAL = 0.55;
     public static double ALPHA_IMPACT = 0.05;
 
-    // -- 高阶视觉参数：动态协方差与过滤器 --
     public static double LL_MAX_TRUST_SPEED = 15.0;
     public static double LL_MAX_TRUST_DISTANCE = 100.0;
     public static double LL_MAX_STALENESS_MS = 100.0;
 
-    // 多 Tag 锁定时的超高置信度权重
     public static double LL_MULTI_TAG_POS_WEIGHT = 0.8;
     public static double LL_MULTI_TAG_HEADING_WEIGHT = 0.1;
-    // 单 Tag 锁定时的基础置信度权重 (会随距离衰减)
     public static double LL_SINGLE_TAG_BASE_POS_WEIGHT = 0.6;
     public static double LL_SINGLE_TAG_BASE_HEADING_WEIGHT = 0.02;
-    // 单 Tag 开始信任衰减的最大距离 (米)
-    public static double LL_MAX_SINGLE_TAG_DIST_M = 4.0;
+    public static double LL_MAX_SINGLE_TAG_DIST_M = 3;
 
-    // 防瞬移拦截距离(英寸)：如果一帧视觉误差过大，直接丢弃，防止底盘抽搐
     public static double LL_MAX_TELEPORT_INCHES = 15.0;
 
     public static double TARGET_HITBOX_WIDTH_INCHES = 16;
     public static double MAX_AIM_ANGLE_TOLERANCE = 8.5;
 
-    // ==========================================================
-    // === 【Dashboard 调参区】动力学前馈控制 (Feed-Forward) ===
-    // ==========================================================
-    public static double kV_TURRET = 0.0005;
-    public static double kA_TURRET = 0.0004;
+    public static double kV_TURRET = 0.00055;
+    public static double kA_TURRET = 0.00043;
 
-    // ==========================================================
-    // === 【Dashboard 调参区】双段 PID 控制参数 ===
-    // ==========================================================
-    public static double STAGE_THRESHOLD = 14.0;
+    public static double STAGE_THRESHOLD = 30.0;
 
     public static double kP_far = 0.05;
     public static double kI_far = 0.00;
-    public static double kD_far = 0.0003;
+    public static double kD_far = 0.00005;
 
     public static double kP_near = 0.03;
     public static double kI_near = 0.00;
-    public static double kD_near = 0.000001;
-    public static double kS_near = 0.05;
+    public static double kD_near = 0.0005;
+    public static double kS_near = 0.0;
     public static double I_ZONE_near = 3.0;
+
+    public static double STAGE_THRESHOLD_UNWIND = 80.0;
+
+    public static double kP_far_unwind = 1;
+    public static double kI_far_unwind = 0.0;
+    public static double kD_far_unwind = 0.0;
+
+    public static double kP_near_unwind = 0.025;
+    public static double kI_near_unwind = 0.01;
+    public static double kD_near_unwind = 0.0015;
+    public static double kS_near_unwind = 0.0;
+    public static double I_ZONE_near_unwind = 5.0;
 
     public static double MAX_INTEGRAL_POWER = 0.08;
     public static double ERROR_TOLERANCE = 0.3;
 
-    // ==========================================================
-    // === 内部状态变量 (不需要在 Dashboard 调试) ===
-    // ==========================================================
     private long lastLoopTime = 0;
     private double lastRawVxField = 0;
     private double lastRawVyField = 0;
@@ -115,21 +107,15 @@ public class AutoAimSubsystem {
     private boolean isLLActiveThisLoop = false;
     private double dynamicToleranceDeg = 2.0;
 
-    // 去重保护
+    private boolean isCurrentlyUnwinding = false;
+
     private double lastProcessedBotposeX = -9999.0;
     private double lastProcessedBotposeY = -9999.0;
 
-    // ==========================================================
-    // === 虚拟偏移层 (Virtual Offset) ===
-    // ==========================================================
-    // 永远不覆写底盘里程计，仅维护纯软件坐标偏移量
     private double visionOffsetX = 0.0;
     private double visionOffsetY = 0.0;
     private double visionOffsetH_Rad = 0.0;
 
-    // ==========================================================
-    // === 位姿历史队列 (Pose Buffer / Time Machine) ===
-    // ==========================================================
     private static final int POSE_BUFFER_SIZE = 100;
     private OdoRecord[] poseBuffer = new OdoRecord[POSE_BUFFER_SIZE];
     private int poseBufferIndex = 0;
@@ -421,7 +407,14 @@ public class AutoAimSubsystem {
             if (targetEncoderDeg < TURRET_SOFT_LIMIT_CW) targetEncoderDeg = TURRET_SOFT_LIMIT_CW;
 
             command.pidErrorDeg = targetEncoderDeg - encoderDeg;
-            command.isUnwinding = Math.abs(command.pidErrorDeg) > 45.0;
+
+            if (Math.abs(command.pidErrorDeg) > 45.0) {
+                isCurrentlyUnwinding = true;
+            } else if (Math.abs(command.pidErrorDeg) <= 5.0) {
+                isCurrentlyUnwinding = false;
+            }
+            command.isUnwinding = isCurrentlyUnwinding;
+
             command.isAimLocked = Math.abs(command.pidErrorDeg) <= dynamicToleranceDeg;
 
             double requiredOmegaFromRotation = -rOmegaDeg;
@@ -443,6 +436,16 @@ public class AutoAimSubsystem {
                 double dt = pidTimer.seconds();
                 if (dt == 0) dt = 0.001;
 
+                double active_STAGE_THRESHOLD = command.isUnwinding ? STAGE_THRESHOLD_UNWIND : STAGE_THRESHOLD;
+                double active_kP_far          = command.isUnwinding ? kP_far_unwind          : kP_far;
+                double active_kI_far          = command.isUnwinding ? kI_far_unwind          : kI_far;
+                double active_kD_far          = command.isUnwinding ? kD_far_unwind          : kD_far;
+                double active_kP_near         = command.isUnwinding ? kP_near_unwind         : kP_near;
+                double active_kI_near         = command.isUnwinding ? kI_near_unwind         : kI_near;
+                double active_kD_near         = command.isUnwinding ? kD_near_unwind         : kD_near;
+                double active_kS_near         = command.isUnwinding ? kS_near_unwind         : kS_near;
+                double active_I_ZONE_near     = command.isUnwinding ? I_ZONE_near_unwind     : I_ZONE_near;
+
                 double pidPower = 0.0;
 
                 if (absError <= ERROR_TOLERANCE) {
@@ -451,26 +454,26 @@ public class AutoAimSubsystem {
                     currentStageName = "【到达目标】";
                     wasInStage1 = false;
                 }
-                else if (absError > STAGE_THRESHOLD) {
-                    currentStageName = "【第一段】(远距)";
+                else if (absError > active_STAGE_THRESHOLD) {
+                    currentStageName = command.isUnwinding ? "【复位第一段】(远距)" : "【第一段】(远距)";
                     wasInStage1 = true;
 
                     integralSum += error * dt;
                     double derivative = (error - lastError) / dt;
 
-                    pidPower = (kP_far * error) + (kI_far * integralSum) + (kD_far * derivative);
+                    pidPower = (active_kP_far * error) + (active_kI_far * integralSum) + (active_kD_far * derivative);
                 }
                 else {
-                    currentStageName = "【第二段】(近距)";
+                    currentStageName = command.isUnwinding ? "【复位第二段】(近距)" : "【第二段】(近距)";
 
                     if (wasInStage1 || Math.signum(error) != Math.signum(lastError)) {
                         integralSum = 0;
                         wasInStage1 = false;
                     }
 
-                    if (absError < I_ZONE_near) {
+                    if (absError < active_I_ZONE_near) {
                         integralSum += error * dt;
-                        double maxISum = MAX_INTEGRAL_POWER / (kI_near == 0 ? 1 : kI_near);
+                        double maxISum = MAX_INTEGRAL_POWER / (active_kI_near == 0 ? 1 : active_kI_near);
                         integralSum = Math.max(-maxISum, Math.min(maxISum, integralSum));
                     } else {
                         integralSum = 0;
@@ -478,8 +481,8 @@ public class AutoAimSubsystem {
 
                     double derivative = (error - lastError) / dt;
 
-                    double frictionFF = Math.signum(error) * kS_near;
-                    pidPower = (kP_near * error) + (kI_near * integralSum) + (kD_near * derivative) + frictionFF;
+                    double frictionFF = Math.signum(error) * active_kS_near;
+                    pidPower = (active_kP_near * error) + (active_kI_near * integralSum) + (active_kD_near * derivative) + frictionFF;
                 }
 
                 double finalPower = pidPower + feedforwardPower;
@@ -529,18 +532,15 @@ public class AutoAimSubsystem {
         }
     }
 
-    // 更新：重新设定坐标时，硬件和虚拟层都要清理，防止幽灵数据
     public void setInitialPose(Pose2D pose) {
         if (robotPose != null) {
             robotPose.setPose(pose);
             robotPose.update();
 
-            // 清理软件虚拟偏移
             visionOffsetX = 0;
             visionOffsetY = 0;
             visionOffsetH_Rad = 0;
 
-            // 清理时光机缓存，防止切坐标时发生历史污染
             for(int i = 0; i < POSE_BUFFER_SIZE; i++) {
                 if (poseBuffer[i] != null) {
                     poseBuffer[i].timestampNano = 0;
