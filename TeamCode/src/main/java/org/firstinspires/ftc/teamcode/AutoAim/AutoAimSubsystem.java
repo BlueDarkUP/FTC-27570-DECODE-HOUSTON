@@ -23,7 +23,6 @@ public class AutoAimSubsystem {
     private Telemetry telemetry;
     private DcMotorEx turretMotor;
 
-    // ===== 自动阶段外部数据注入 =====
     private boolean isAutonomousMode = false;
     private double extX, extY, extH, extVx, extVy, extOmega;
 
@@ -77,7 +76,10 @@ public class AutoAimSubsystem {
     public static double FILTER_KA_3 = 0.10;
     public static double FILTER_D_3 = 0.15;
 
-    // === 自动自瞄 PID 参数 ===
+    public static double TARGET_SLEW_RATE_DEG_PER_SEC = 600.0;
+    private double profiledTargetDeg = Double.NaN;
+    private double lastEncoderDegForDeriv = 0.0;
+
     public static double STAGE_THRESHOLD = 30.0;
     public static double kP_far = 0.05;
     public static double kI_far = 0.00;
@@ -103,9 +105,6 @@ public class AutoAimSubsystem {
     public static double MAX_INTEGRAL_POWER = 0.08;
     public static double ERROR_TOLERANCE = 0.3;
 
-    // ==========================================================
-    // === 新增：手动模式两段式 PID 参数 (回正0度专用) ===
-    // ==========================================================
     public static double MANUAL_STAGE_THRESHOLD = 14.0;
     public static double kP_far_manual = 0.05;
     public static double kI_far_manual = 0.00;
@@ -119,7 +118,6 @@ public class AutoAimSubsystem {
     public static double MANUAL_MAX_INTEGRAL_POWER = 0.08;
     public static double MANUAL_ERROR_TOLERANCE = 0.3;
 
-    // 内部状态变量
     private long lastLoopTime = 0;
     private double lastRawVxField = 0, lastRawVyField = 0;
     private double lastSmoothVxField = 0, lastSmoothVyField = 0;
@@ -128,16 +126,10 @@ public class AutoAimSubsystem {
     private boolean isImpactDetected = false;
     private ElapsedTime impactTimer = new ElapsedTime();
 
-    // 自动模式积分器
     private double integralSum = 0;
-    private double lastError = 0;
-    private boolean wasInStage1 = false;
 
-    // 手动模式积分器与刹车锁
     private double manualIntegralSum = 0;
-    private double manualLastError = 0;
-    private boolean manualWasInStage1 = false;
-    private boolean isManualBrakeLocked = false; // 新增：手动档云台到达零度死区后永远锁死直到退出手动档
+    private boolean isManualBrakeLocked = false;
 
     private String currentStageName = "IDLE";
     private ElapsedTime pidTimer = new ElapsedTime();
@@ -146,7 +138,7 @@ public class AutoAimSubsystem {
     private double dynamicToleranceDeg = 2.0;
 
     private boolean isCurrentlyUnwinding = false;
-    private double lastFilteredDerivative = 0.0;
+    private double lastFilteredTurretVel = 0.0;
     private double lastFilteredAlphaDeg = 0.0;
     private double currentActiveKaAlpha = 1.0;
     private double currentActiveDAlpha = 1.0;
@@ -255,7 +247,6 @@ public class AutoAimSubsystem {
         }
     }
 
-    // 核心重载：支持接收 手动模式 和 紧急刹车 参数
     public TurretCommand update(double targetX, double targetY, boolean isShootingMode, boolean isManualMode, double manualDistance, boolean emergencyBrake) {
         TurretCommand command = new TurretCommand();
 
@@ -291,7 +282,6 @@ public class AutoAimSubsystem {
         double rY = rawY + visionOffsetY;
         double rH_Rad = AngleUnit.normalizeRadians(rawH_Rad + visionOffsetH_Rad);
 
-        // ===== 视觉融合代码保持运行 =====
         double chassisDistToTarget = Math.hypot(targetX - rX, targetY - rY);
         isLLActiveThisLoop = false;
         if (ll != null && speed < LL_MAX_TRUST_SPEED) {
@@ -356,28 +346,26 @@ public class AutoAimSubsystem {
         lastSmoothVxField = smoothVx; lastSmoothVyField = smoothVy;
         lastLoopTime = currentNanoTime;
 
-        // ==============================================================
-        // 核心解算器与目标覆盖：区分紧急刹车、手动档与自瞄
-        // ==============================================================
         AimCalculator.AimResult aim = null;
         double feedforwardPower = 0.0;
         double encoderDeg = turretMotor != null ? (turretMotor.getCurrentPosition() / TICKS_PER_DEGREE) : 0;
         double currentAngleRelToChassis = encoderDeg + TURRET_START_OFFSET_DEG;
 
+        double currentTurretVelDeg = (encoderDeg - lastEncoderDegForDeriv) / dtSec;
+        lastEncoderDegForDeriv = encoderDeg;
+
         if (emergencyBrake) {
-            // == 紧急刹车：清空所有PID状态并抱死 ==
             if (turretMotor != null) turretMotor.setPower(0);
-            integralSum = 0; lastError = 0;
-            manualIntegralSum = 0; manualLastError = 0;
-            isManualBrakeLocked = false; // 解除手动锁
+            integralSum = 0;
+            manualIntegralSum = 0;
+            isManualBrakeLocked = false;
             currentStageName = "【紧急刹车锁死】";
             currentTurretPower = 0;
-            command.hasTarget = false; // 会强制让发射和预蓄力也停止
+            command.hasTarget = false;
+            profiledTargetDeg = Double.NaN;
             return command;
 
         } else if (isManualMode) {
-            // == 手动模式：虚拟目标，锁定正前方，双段PID回正 ==
-            // 生成正前方的虚拟点 (排除速度干扰，做静态解算)
             double vTargetX = turretX + manualDistance * (-sinH);
             double vTargetY = turretY + manualDistance * (cosH);
             aim = AimCalculator.solveAim(turretX, turretY, 0, 0, 0, 0, vTargetX, vTargetY);
@@ -386,57 +374,45 @@ public class AutoAimSubsystem {
             command.targetRpm = (aim != null) ? aim.rpm : 3000.0;
             command.targetPitch = (aim != null) ? aim.pitch : 0.5;
             command.targetDistance = manualDistance;
-            command.isAimLocked = true; // 手动档默认云台已锁定前方
+            command.isAimLocked = true;
             command.isUnwinding = false;
 
-            // 清理自动档状态
             integralSum = 0;
-            lastError = 0;
+            profiledTargetDeg = Double.NaN;
 
-            // 目标为相对于底盘 0 度
             double error = AngleUnit.normalizeDegrees(0.0 - currentAngleRelToChassis);
             command.pidErrorDeg = error;
             double absError = Math.abs(error);
-            double dtPID = Math.max(pidTimer.seconds(), 0.001);
             double power = 0.0;
 
-            // 修改为到达死区后永久锁死逻辑
             if (isManualBrakeLocked) {
-                // 如果已经进入刹车锁死状态，则保持0输出（利用硬件BRAKE模式锁死）
                 power = 0;
                 currentStageName = "【手动到达锁定】(BRAKE)";
             } else {
                 if (absError <= MANUAL_ERROR_TOLERANCE) {
-                    // 首次进入容差范围，立刻锁死
                     isManualBrakeLocked = true;
                     power = 0;
                     manualIntegralSum = 0;
                     currentStageName = "【手动到达锁定】(BRAKE)";
-                    manualWasInStage1 = false;
-                }
-                else if (absError > MANUAL_STAGE_THRESHOLD) {
-                    currentStageName = "【手动一段】(极速回正)";
-                    manualWasInStage1 = true;
-                    manualIntegralSum += error * dtPID;
-                    double derivative = (error - manualLastError) / dtPID;
-                    power = (kP_far_manual * error) + (kI_far_manual * manualIntegralSum) + (kD_far_manual * derivative);
-                }
-                else {
-                    currentStageName = "【手动二段】(近距精调)";
-                    if (manualWasInStage1 || Math.signum(error) != Math.signum(manualLastError)) {
-                        manualIntegralSum = 0;
-                        manualWasInStage1 = false;
-                    }
+                } else {
+                    currentStageName = "【手动平滑控制】";
+
+                    double ratio = Math.min(1.0, absError / MANUAL_STAGE_THRESHOLD);
+                    double currentP = kP_near_manual + ratio * (kP_far_manual - kP_near_manual);
+                    double currentI = kI_near_manual + ratio * (kI_far_manual - kI_near_manual);
+                    double currentD = kD_near_manual + ratio * (kD_far_manual - kD_near_manual);
+
                     if (absError < I_ZONE_near_manual) {
-                        manualIntegralSum += error * dtPID;
-                        double maxISum = MANUAL_MAX_INTEGRAL_POWER / (kI_near_manual == 0 ? 1 : kI_near_manual);
+                        manualIntegralSum += error * dtSec;
+                        double maxISum = MANUAL_MAX_INTEGRAL_POWER / (currentI == 0 ? 1 : currentI);
                         manualIntegralSum = Math.max(-maxISum, Math.min(maxISum, manualIntegralSum));
                     } else {
                         manualIntegralSum = 0;
                     }
-                    double derivative = (error - manualLastError) / dtPID;
-                    double pidPower = (kP_near_manual * error) + (kI_near_manual * manualIntegralSum) + (kD_near_manual * derivative);
-                    double feedforward = Math.signum(error) * kS_near_manual;
+
+                    double derivativeTerm = -currentD * currentTurretVelDeg;
+                    double pidPower = (currentP * error) + (currentI * manualIntegralSum) + derivativeTerm;
+                    double feedforward = (absError < MANUAL_STAGE_THRESHOLD) ? (Math.signum(error) * kS_near_manual) : 0;
                     power = pidPower + feedforward;
                 }
             }
@@ -444,15 +420,10 @@ public class AutoAimSubsystem {
             power = Math.max(-1.0, Math.min(1.0, power));
             if (turretMotor != null) turretMotor.setPower(power);
             currentTurretPower = power;
-            manualLastError = error;
-            pidTimer.reset();
 
         } else {
-            // == 原始自动自瞄模式 ==
             isManualBrakeLocked = false;
-            // 清理手动档状态
             manualIntegralSum = 0;
-            manualLastError = 0;
 
             aim = AimCalculator.solveAim(turretX, turretY, smoothVx, smoothVy, lastSmoothAxField, lastSmoothAyField, targetX, targetY);
             double distanceToTarget = Math.hypot(targetX - turretX, targetY - turretY);
@@ -478,30 +449,38 @@ public class AutoAimSubsystem {
                 double currentChassisHeading = Math.toDegrees(rH_Rad);
                 double desiredRelDegToChassis = targetAbsHeading - currentChassisHeading;
                 double shortestPathError = AngleUnit.normalizeDegrees(desiredRelDegToChassis - currentAngleRelToChassis);
-                double targetEncoderDeg = encoderDeg + shortestPathError;
+                double rawTargetEncoderDeg = encoderDeg + shortestPathError;
 
-                if (targetEncoderDeg > TURRET_SOFT_LIMIT_CCW) targetEncoderDeg -= 360.0;
-                else if (targetEncoderDeg < TURRET_SOFT_LIMIT_CW) targetEncoderDeg += 360.0;
+                if (rawTargetEncoderDeg > TURRET_SOFT_LIMIT_CCW) rawTargetEncoderDeg -= 360.0;
+                else if (rawTargetEncoderDeg < TURRET_SOFT_LIMIT_CW) rawTargetEncoderDeg += 360.0;
+                rawTargetEncoderDeg = Math.max(TURRET_SOFT_LIMIT_CW, Math.min(TURRET_SOFT_LIMIT_CCW, rawTargetEncoderDeg));
 
-                targetEncoderDeg = Math.max(TURRET_SOFT_LIMIT_CW, Math.min(TURRET_SOFT_LIMIT_CCW, targetEncoderDeg));
-                command.pidErrorDeg = targetEncoderDeg - encoderDeg;
+                command.pidErrorDeg = rawTargetEncoderDeg - encoderDeg;
 
                 isCurrentlyUnwinding = Math.abs(command.pidErrorDeg) > 45.0 ? true : (Math.abs(command.pidErrorDeg) <= 5.0 ? false : isCurrentlyUnwinding);
                 command.isUnwinding = isCurrentlyUnwinding;
                 command.isAimLocked = Math.abs(command.pidErrorDeg) <= dynamicToleranceDeg;
+
+                if (command.isUnwinding || Double.isNaN(profiledTargetDeg)) {
+                    profiledTargetDeg = rawTargetEncoderDeg;
+                } else {
+                    double maxStep = TARGET_SLEW_RATE_DEG_PER_SEC * dtSec;
+                    if (Math.abs(rawTargetEncoderDeg - profiledTargetDeg) <= maxStep) {
+                        profiledTargetDeg = rawTargetEncoderDeg;
+                    } else {
+                        profiledTargetDeg += Math.signum(rawTargetEncoderDeg - profiledTargetDeg) * maxStep;
+                    }
+                }
+
+                double activePidError = profiledTargetDeg - encoderDeg;
 
                 double dx = targetX - turretX, dy = targetY - turretY, distSq = dx * dx + dy * dy;
                 double tangentialVelocity = (turretVx * dy - turretVy * dx) / Math.sqrt(distSq);
                 double reqOmegaTrans = Math.toDegrees(tangentialVelocity / Math.sqrt(distSq));
                 feedforwardPower = ((-rOmegaDeg + reqOmegaTrans) * kV_TURRET) + (-currentAlphaDeg * (isShootingMode ? kA_TURRET : 0.0));
 
-                double dtPID = Math.max(pidTimer.seconds(), 0.001);
-                double error = command.pidErrorDeg;
-                double effectiveError = Math.abs(error) < PID_DEADBAND_DEG ? 0 : error;
+                double effectiveError = Math.abs(activePidError) < PID_DEADBAND_DEG ? 0 : activePidError;
                 double effectiveAbsError = Math.abs(effectiveError);
-
-                double filteredDeriv = (currentActiveDAlpha * ((effectiveError - lastError) / dtPID)) + ((1.0 - currentActiveDAlpha) * lastFilteredDerivative);
-                lastFilteredDerivative = filteredDeriv;
 
                 double aSTAGE = command.isUnwinding ? STAGE_THRESHOLD_UNWIND : STAGE_THRESHOLD;
                 double aP_f = command.isUnwinding ? kP_far_unwind : kP_far, aI_f = command.isUnwinding ? kI_far_unwind : kI_far, aD_f = command.isUnwinding ? kD_far_unwind : kD_far;
@@ -509,32 +488,39 @@ public class AutoAimSubsystem {
                 double aS_n = command.isUnwinding ? kS_near_unwind : kS_near, aI_zone = command.isUnwinding ? I_ZONE_near_unwind : I_ZONE_near;
 
                 double pidPower = 0;
-                if (Math.abs(error) <= ERROR_TOLERANCE) {
-                    pidPower = 0; integralSum = 0; currentStageName = "【到达目标】"; wasInStage1 = false;
-                } else if (effectiveAbsError > aSTAGE) {
-                    currentStageName = command.isUnwinding ? "【复位一段】" : "【自动一段】";
-                    wasInStage1 = true; integralSum += effectiveError * dtPID;
-                    pidPower = (aP_f * effectiveError) + (aI_f * integralSum) + (aD_f * filteredDeriv);
+                if (Math.abs(command.pidErrorDeg) <= ERROR_TOLERANCE) {
+                    pidPower = 0; integralSum = 0; currentStageName = "【到达目标】";
                 } else {
-                    currentStageName = command.isUnwinding ? "【复位二段】" : "【自动二段】";
-                    if (wasInStage1 || Math.signum(effectiveError) != Math.signum(lastError)) { integralSum = 0; wasInStage1 = false; }
-                    if (effectiveAbsError > 0 && effectiveAbsError < aI_zone) {
-                        integralSum += effectiveError * dtPID;
-                        double maxISum = MAX_INTEGRAL_POWER / (aI_n == 0 ? 1 : aI_n);
-                        integralSum = Math.max(-maxISum, Math.min(maxISum, integralSum));
-                    } else if (effectiveAbsError > 0) integralSum = 0;
+                    currentStageName = command.isUnwinding ? "【复位平滑追踪】" : "【自动平滑追踪】";
 
-                    pidPower = (aP_n * effectiveError) + (aI_n * integralSum) + (aD_n * filteredDeriv) + ((effectiveAbsError == 0) ? 0 : (Math.signum(effectiveError) * aS_n));
+                    double blendRatio = Math.min(1.0, effectiveAbsError / aSTAGE);
+                    double currentP = aP_n + blendRatio * (aP_f - aP_n);
+                    double currentI = aI_n + blendRatio * (aI_f - aI_n);
+                    double currentD = aD_n + blendRatio * (aD_f - aD_n);
+
+                    if (effectiveAbsError > 0 && effectiveAbsError < aI_zone) {
+                        integralSum += effectiveError * dtSec;
+                        double maxISum = MAX_INTEGRAL_POWER / (currentI == 0 ? 1 : currentI);
+                        integralSum = Math.max(-maxISum, Math.min(maxISum, integralSum));
+                    } else {
+                        integralSum = 0;
+                    }
+
+                    double rawDerivativeTerm = -currentD * currentTurretVelDeg;
+                    double filteredDeriv = (currentActiveDAlpha * rawDerivativeTerm) + ((1.0 - currentActiveDAlpha) * lastFilteredTurretVel);
+                    lastFilteredTurretVel = filteredDeriv;
+
+                    pidPower = (currentP * effectiveError) + (currentI * integralSum) + filteredDeriv + ((effectiveAbsError == 0) ? 0 : (Math.signum(effectiveError) * aS_n));
                 }
 
                 double finalPower = Math.max(-1.0, Math.min(1.0, pidPower + feedforwardPower));
                 turretMotor.setPower(finalPower);
                 currentTurretPower = finalPower;
-                lastError = effectiveError;
                 pidTimer.reset();
             } else {
                 if (turretMotor != null) turretMotor.setPower(0);
-                currentTurretPower = 0; integralSum = 0; lastError = 0; wasInStage1 = false;
+                currentTurretPower = 0; integralSum = 0;
+                profiledTargetDeg = Double.NaN;
                 currentStageName = "LOST/IDLE"; pidTimer.reset();
             }
         }

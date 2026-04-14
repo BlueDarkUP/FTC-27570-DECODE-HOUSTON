@@ -16,36 +16,29 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-// 导入您专属的 Constants
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 @Autonomous(name = "Full Routine with Door Extract Loop", group = "Autonomous")
 public class FullRoutineDoorExtractAuto extends OpMode {
 
-    // ==========================================================
-    // === 1. 硬件与子系统变量 ===
-    // ==========================================================
     private Follower follower;
     private DcMotorEx intakeMotor;
     private DcMotorEx turretMotor;
 
     private DcMotorEx motorSH;
     private DcMotorEx motorHS;
-    private Servo bbb; // 开火挡板舵机
+    private Servo bbb;
 
-    private Servo LP;  // 俯仰舵机 LP
-    private Servo RP;  // 俯仰舵机 RP
+    private Servo LP;
+    private Servo RP;
 
     private Timer pathTimer;
     private Timer opmodeTimer;
     private int pathState;
 
-    private final int MAX_DOOR_EXTRACT_LOOPS = 3; // ★ 在这里修改循环次数 (3次)
+    private final int MAX_DOOR_EXTRACT_LOOPS = 3;
     private int doorExtractLoopCount = 0;
 
-    // ==========================================================
-    // === 3. 云台双段 PIDF 参数与状态变量 ===
-    // ==========================================================
     private final double STAGE_THRESHOLD = 14.0;
     private final double kP_far = 0.05;
     private final double kI_far = 0.00;
@@ -68,12 +61,8 @@ public class FullRoutineDoorExtractAuto extends OpMode {
     private boolean wasInStage1 = false;
     private ElapsedTime pidTimer;
 
-    // 全局云台目标角度
     private double turretTargetAngle = 0.0;
 
-    // ==========================================================
-    // === 4. 飞轮 PIDF + Bang-Bang 参数与状态变量 ===
-    // ==========================================================
     private final double FW_RPM_LOWER_BOUND = 3000.0;
     private final double FW_RPM_UPPER_BOUND = 5050.0;
     private final double FW_MAX_TOLERANCE = 1000;
@@ -91,27 +80,19 @@ public class FullRoutineDoorExtractAuto extends OpMode {
     private boolean isFlywheelReady = false;
     private ElapsedTime flywheelTimer;
 
-    // 全局飞轮变量
     private double flywheelTargetRPM = 0.0;
     private double flywheelCurrentRPM = 0.0;
 
-    // ==========================================================
-    // === 5. 射击控制状态机变量 (Non-blocking) ===
-    // ==========================================================
     private enum ShootMode { NONE, PRECISION, BLIND }
     private ShootMode currentShootMode = ShootMode.NONE;
     private ElapsedTime shootTimer;
     private double activeShootDuration = 0.0;
 
-    // 俯仰舵机范围常数
     private final double LP_UP = 1;
     private final double LP_DOWN = 0.4;
     private final double RP_UP = 0;
     private final double RP_DOWN = 0.5;
 
-    // ==========================================================
-    // === 6. 新版路径声明区 (PathChains) ===
-    // ==========================================================
     public PathChain diyigepaoda;
     public PathChain xidierpai;
     public PathChain fashedierpai;
@@ -255,11 +236,6 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 .build();
     }
 
-    // ==========================================================
-    // === 附属功能子系统控制函数 ===
-    // ==========================================================
-
-    // 控制俯仰角 Servo
     private void setPitchServos(double targetPitch) {
         double clampedLP = Math.max(LP_DOWN, Math.min(LP_UP, targetPitch));
         double proportion = (clampedLP - LP_DOWN) / (LP_UP - LP_DOWN);
@@ -391,10 +367,6 @@ public class FullRoutineDoorExtractAuto extends OpMode {
         motorHS.setPower(power);
     }
 
-    // ==========================================================
-    // === 自动射击管理系统 (Non-Blocking) ===
-    // ==========================================================
-
     public void startPrecisionShoot(double durationSeconds) {
         currentShootMode = ShootMode.PRECISION;
         activeShootDuration = durationSeconds;
@@ -439,10 +411,6 @@ public class FullRoutineDoorExtractAuto extends OpMode {
         }
     }
 
-
-    // ==========================================================
-    // === 自动流程主状态机 ===
-    // ==========================================================
     public void setPathState(int pState) {
         pathState = pState;
         pathTimer.resetTimer();
@@ -450,7 +418,6 @@ public class FullRoutineDoorExtractAuto extends OpMode {
 
     public void autonomousPathUpdate() {
         switch (pathState) {
-            // ================= 1. 第一个跑打路径 (diyigepaoda) =================
             case 10:
                 follower.setMaxPower(0.7);
                 follower.followPath(diyigepaoda, false);
@@ -493,23 +460,21 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 if (!follower.isBusy()) { setPathState(30); }
                 break;
 
-            // ================= 3. 发射第二排 (fashedierpai) =================
             case 30:
                 follower.followPath(fashedierpai, true);
-                turretTargetAngle = -93.0; // ★ 发射前云台调整至 -93 度
-                flywheelTargetRPM = 3400.0; // ★ 提升 RPM 到 3400
-                intakeMotor.setPower(0.0);  // 跑动时关闭吸取，等待就位后打出
+                turretTargetAngle = -93.0;
+                flywheelTargetRPM = 3400.0;
+                intakeMotor.setPower(0.0);
                 setPathState(31);
                 break;
             case 31:
                 if (!follower.isBusy()) {
-                    setPathState(315); // 进入非阻塞等待状态
+                    setPathState(315);
                 }
                 break;
             case 315:
-                // 非阻塞等待 0.5 秒，允许底盘完成微调并且系统继续维持 PID
                 if (pathTimer.getElapsedTimeSeconds() >= 0.5) {
-                    startPrecisionShoot(1); // ★ 闭环射击 2.0 秒
+                    startPrecisionShoot(1);
                     setPathState(32);
                 }
                 break;
@@ -520,42 +485,38 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 }
                 break;
 
-            // ================= 4. 开门嘬循环 (kaimenzuo) =================
             case 40:
                 follower.followPath(kaimenzuo, true);
-                intakeMotor.setPower(1.0);  // ★ 循环期间持续开启 intake
-                flywheelTargetRPM = 3400.0; // 回调转速
+                intakeMotor.setPower(1.0);
+                flywheelTargetRPM = 3400.0;
                 setPathState(41);
                 break;
             case 41:
                 if (!follower.isBusy()) {
-                    setPathState(42); // 进入非阻塞等待状态
+                    setPathState(42);
                 }
                 break;
             case 42:
-                // 在这里非阻塞等待 0.5 秒，允许底盘在结束位置平滑并且维持 PID
                 if (pathTimer.getElapsedTimeSeconds() >= 2) {
                     setPathState(50);
                 }
                 break;
 
-            // ================= 5. 开门嘬返回发射 (fashekaimenzuo) =================
             case 50:
                 follower.followPath(fashekaimenzuo, true);
-                turretTargetAngle = -93.0; // ★ 开门嘬的发射也是 -93 度
-                flywheelTargetRPM = 3400.0; // ★ 转速 3400
-                intakeMotor.setPower(1.0);  // ★ 跑回去的时候持续开 intake 保证球进仓
+                turretTargetAngle = -93.0;
+                flywheelTargetRPM = 3400.0;
+                intakeMotor.setPower(1.0);
                 setPathState(51);
                 break;
             case 51:
                 if (!follower.isBusy()) {
-                    setPathState(515); // 进入非阻塞等待状态
+                    setPathState(515);
                 }
                 break;
             case 515:
-                // 非阻塞等待 0.5 秒
                 if (pathTimer.getElapsedTimeSeconds() >= 0.5) {
-                    startPrecisionShoot(1.0); // ★ 闭环射击 2.0 秒
+                    startPrecisionShoot(1.0);
                     setPathState(52);
                 }
                 break;
@@ -571,11 +532,10 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 }
                 break;
 
-            // ================= 6. 准备吸第一排 (zhunbeixidiyipai) =================
             case 60:
                 follower.followPath(zhunbeixidiyipai, false);
                 flywheelTargetRPM = 3400.0;
-                intakeMotor.setPower(1.0); // ★ 持续开启 intake
+                intakeMotor.setPower(1.0);
                 setPathState(61);
                 break;
             case 61:
@@ -584,33 +544,30 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 }
                 break;
 
-            // ================= 7. 吸第一排 (xidiyipai) =================
             case 70:
                 follower.followPath(xidiyipai, false);
-                intakeMotor.setPower(1.0); // ★ 持续开启 intake
+                intakeMotor.setPower(1.0);
                 setPathState(71);
                 break;
             case 71:
                 if (!follower.isBusy()) { setPathState(80); }
                 break;
 
-            // ================= 8. 发射第一排 (fashediyipai) =================
             case 80:
                 follower.followPath(fashediyipai, true);
-                turretTargetAngle = -93.0; // ★ 第一排发射云台 -93 度
-                flywheelTargetRPM = 3400.0; // ★ 转速 3400
-                intakeMotor.setPower(0.0);  // 回程停吸取
+                turretTargetAngle = -93.0;
+                flywheelTargetRPM = 3400.0;
+                intakeMotor.setPower(0.0);
                 setPathState(81);
                 break;
             case 81:
                 if (!follower.isBusy()) {
-                    setPathState(815); // 进入非阻塞等待状态
+                    setPathState(815);
                 }
                 break;
             case 815:
-                // 非阻塞等待 0.5 秒
                 if (pathTimer.getElapsedTimeSeconds() >= 0.5) {
-                    startPrecisionShoot(1.0); // ★ 闭环射击 2.0 秒
+                    startPrecisionShoot(1.0);
                     setPathState(82);
                 }
                 break;
@@ -618,11 +575,10 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 if (!isShootingActive()) { setPathState(90); }
                 break;
 
-            // ================= 9. 准备吸第三排 (zhunbeixidisanpai) =================
             case 90:
                 follower.followPath(zhunbeixidisanpai, false);
                 flywheelTargetRPM = 3400.0;
-                intakeMotor.setPower(1.0); // ★ 持续开启 intake
+                intakeMotor.setPower(1.0);
                 setPathState(91);
                 break;
             case 91:
@@ -631,33 +587,30 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 }
                 break;
 
-            // ================= 10. 吸第三排 (xidisanpai) =================
             case 100:
                 follower.followPath(xidisanpai, false);
-                intakeMotor.setPower(1.0); // ★ 持续开启 intake
+                intakeMotor.setPower(1.0);
                 setPathState(101);
                 break;
             case 101:
                 if (!follower.isBusy()) { setPathState(110); }
                 break;
 
-            // ================= 11. 发射第三排 (fashedisanpai) =================
             case 110:
                 follower.followPath(fashedisanpai, true);
-                turretTargetAngle = -118.0; // ★ 第三排发射云台特殊角度 -122 度
-                flywheelTargetRPM = 3400.0; // ★ 转速 3400
+                turretTargetAngle = -118.0;
+                flywheelTargetRPM = 3400.0;
                 intakeMotor.setPower(0.0);
                 setPathState(111);
                 break;
             case 111:
                 if (!follower.isBusy()) {
-                    setPathState(1115); // 进入非阻塞等待状态
+                    setPathState(1115);
                 }
                 break;
             case 1115:
-                // 非阻塞等待 0.5 秒
                 if (pathTimer.getElapsedTimeSeconds() >= 0.5) {
-                    startPrecisionShoot(1.0); // ★ 闭环射击 2.0 秒
+                    startPrecisionShoot(1.0);
                     setPathState(112);
                 }
                 break;
@@ -665,18 +618,17 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 if (!isShootingActive()) { setPathState(120); }
                 break;
 
-            // ================= 12. 停靠 (tingkao) =================
             case 120:
                 follower.followPath(tingkao, true);
-                turretTargetAngle = 0.0; // ★ 停靠时摆正云台到 0
-                flywheelTargetRPM = 0.0; // ★ 彻底关闭飞轮
-                intakeMotor.setPower(0.0); // ★ 关闭所有吸取机械
-                bbb.setPosition(0.0); // ★ 关闭挡板
+                turretTargetAngle = 0.0;
+                flywheelTargetRPM = 0.0;
+                intakeMotor.setPower(0.0);
+                bbb.setPosition(0.0);
                 setPathState(121);
                 break;
             case 121:
                 if (!follower.isBusy()) {
-                    setPathState(-1); // 彻底结束
+                    setPathState(-1);
                 }
                 break;
         }
@@ -731,7 +683,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
 
     @Override
     public void init_loop() {
-        setPitchServos(0.7); // ★ 全程保持俯仰角 0.7
+        setPitchServos(0.7);
         updateTurret();
         updateFlywheel();
     }

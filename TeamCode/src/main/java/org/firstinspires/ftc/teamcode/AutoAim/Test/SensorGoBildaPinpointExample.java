@@ -31,11 +31,8 @@ public class SensorGoBildaPinpointExample extends LinearOpMode {
         resetRuntime();
 
         while (opModeIsActive()) {
-            // 2. 在循环开始时更新数据
             poseProvider.update();
 
-            // 3. 使用接口中的方法获取位移和速度
-            // 现在外部程序可以非常轻松地通过调用这些方法来获取所需数据
             double cartesianX_mm = -poseProvider.getX(DistanceUnit.MM);
             double cartesianY_mm = poseProvider.getY(DistanceUnit.MM);
             double cartesianHeading_deg = poseProvider.getHeading(AngleUnit.DEGREES);
@@ -44,16 +41,12 @@ public class SensorGoBildaPinpointExample extends LinearOpMode {
             double cartesianVelY_mm_s = poseProvider.getYVelocity(DistanceUnit.MM);
             double headingVel_deg_s = poseProvider.getHeadingVelocity(AngleUnit.DEGREES);
 
-            // 处理手柄输入
             if (gamepad1.a){
                 poseProvider.reset();
             }
             if (gamepad1.b && poseProvider instanceof PinpointPoseProvider){
-                // 如果需要调用Pinpoint特有的方法，可以进行类型转换
                 ((PinpointPoseProvider) poseProvider).recalibrateIMU();
             }
-
-            // --- 以下是遥测数据显示，与核心逻辑分离 ---
 
             String positionData = String.format(Locale.US, "{X: %.2f mm, Y: %.2f mm, H: %.2f deg}",
                     cartesianX_mm,

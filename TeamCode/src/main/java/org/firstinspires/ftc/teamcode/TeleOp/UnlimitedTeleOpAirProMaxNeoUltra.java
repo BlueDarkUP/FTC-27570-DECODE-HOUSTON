@@ -19,13 +19,11 @@ import org.firstinspires.ftc.teamcode.AutoAim.AutoAimSubsystem;
 @TeleOp(name = "Unlimited TeleOp AirProMaxNeoSuperUltra", group = "Competition")
 public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
-    // ================= 硬件声明 =================
     private DcMotor lf = null, rf = null, lb = null, rb = null;
     private DcMotorEx motorSH, motorHS, motorIntake;
     private Servo bbb, LP, RP;
     private AutoAimSubsystem autoAim;
 
-    // ================= 常量配置 =================
     private final double TARGET_X_WORLD = 136.0;
     private final double TARGET_Y_WORLD = 135.0;
     private final double IDLE_VELOCITY = 3000.0;
@@ -47,16 +45,14 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
     private final double LP_UP = 1, LP_DOWN = 0.4;
     private final double RP_UP = 0, RP_DOWN = 0.5;
 
-    // 状态控制变量
     private boolean isShootingMode = false;
     private boolean lastCircleState = false;
     private boolean isFlywheelReady = false;
 
-    // 新增：按键控制状态变量
     private boolean isManualMode = false;
     private boolean lastLeftBumperState = false;
     private boolean lastSquareState = false;
-    private double manualTargetDistance = 25.0; // 默认手动档距离
+    private double manualTargetDistance = 25.0;
     private boolean manualIdleOverride = false;
 
     private double intakeBrakeReleaseTime = 0.0;
@@ -120,7 +116,6 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
         while (opModeIsActive()) {
 
-            // === 1. 底盘操控 ===
             double y = -gamepad1.left_stick_y;
             double x = gamepad1.left_stick_x * 1.1;
             double rx = gamepad1.right_stick_x;
@@ -130,23 +125,21 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             rf.setPower((y - x - rx) / denominator);
             rb.setPower((y + x - rx) / denominator);
 
-            boolean currentSquareState = gamepad1.x; // PS的方块键对应SDK里的 gamepad1.x
+            boolean currentSquareState = gamepad1.x;
             if (currentSquareState && !lastSquareState) {
                 isShootingMode = false;
                 if (isManualMode) {
-                    manualIdleOverride = true; // 在手动档按下时，解除实时转速跟随，变为怠速
+                    manualIdleOverride = true;
                 }
             }
             lastSquareState = currentSquareState;
 
-            // Circle/圆圈 键：切换射击模式
             boolean currentCircleState = gamepad1.b;
             if (currentCircleState && !lastCircleState) {
                 isShootingMode = !isShootingMode;
             }
             lastCircleState = currentCircleState;
 
-            // Left Bumper：切换 自瞄 / 手动模式
             boolean currentLeftBumperState = gamepad1.left_bumper;
             if (currentLeftBumperState && !lastLeftBumperState) {
                 isManualMode = !isManualMode;
@@ -163,16 +156,13 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
                 else if (gamepad1.dpad_down) { manualTargetDistance = 150.0; manualIdleOverride = false; }
             }
 
-            // Right Bumper：紧急刹车锁死，长按生效
             boolean isEmergencyBrake = gamepad1.right_bumper;
 
-            // 手动档下：屏蔽LT的预蓄力
             boolean isPreSpooling = false;
             if (!isManualMode) {
                 isPreSpooling = gamepad1.left_trigger > TRIGGER_DEADZONE;
             }
 
-            // === 3. 更新子系统 ===
             AutoAimSubsystem.TurretCommand aimCommand = autoAim.update(
                     TARGET_X_WORLD, TARGET_Y_WORLD, isShootingMode,
                     isManualMode, manualTargetDistance, isEmergencyBrake
@@ -182,7 +172,6 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
                 setPitchServos(aimCommand.targetPitch);
             }
 
-            // === 4. 飞轮转速策略 ===
             double targetVelocityRPM = IDLE_VELOCITY;
             String flywheelActionState = "怠速 (Idle)";
 
@@ -230,7 +219,6 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             }
             boolean rpmOK = isFlywheelReady;
 
-            // === 5. 飞轮 PID 控制 ===
             double dt = timer.seconds();
             timer.reset();
             if (dt == 0) dt = 1e-9;
@@ -265,7 +253,6 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             power = Math.max(0.0, Math.min(1.0, power));
             motorSH.setPower(power); motorHS.setPower(power);
 
-            // === 6. 进件与退弹系统 (含防堵转) ===
             double intakeCurrent = motorIntake.getCurrent(CurrentUnit.AMPS);
 
             if (isShootingMode) {
@@ -310,7 +297,6 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             }
             wasUnwinding = aimCommand.isUnwinding;
 
-            // === 7. 遥测状态打印 ===
             telemetry.addData("操作模式", isManualMode ? "🛠️ [手动控制档] (屏蔽漂移)" : "🤖 [自动自瞄档]");
             telemetry.addData("当前动作", isShootingMode ? "[ 发射模式 ]" : "[ 怠速/收集模式 ]");
             telemetry.addData("飞轮动作策略", flywheelActionState);
