@@ -57,6 +57,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
     private boolean lastLeftBumperState = false;
     private boolean lastSquareState = false;
     private double manualTargetDistance = 25.0; // 默认手动档距离
+    private boolean manualIdleOverride = false;
 
     private double intakeBrakeReleaseTime = 0.0;
     private double stallStartTime = 0.0;
@@ -129,11 +130,12 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             rf.setPower((y - x - rx) / denominator);
             rb.setPower((y + x - rx) / denominator);
 
-            // === 2. 模式按键切换 ===
-            // Square/方块 键：直接复位到非射击怠速模式
             boolean currentSquareState = gamepad1.x; // PS的方块键对应SDK里的 gamepad1.x
             if (currentSquareState && !lastSquareState) {
                 isShootingMode = false;
+                if (isManualMode) {
+                    manualIdleOverride = true; // 在手动档按下时，解除实时转速跟随，变为怠速
+                }
             }
             lastSquareState = currentSquareState;
 
@@ -148,15 +150,17 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             boolean currentLeftBumperState = gamepad1.left_bumper;
             if (currentLeftBumperState && !lastLeftBumperState) {
                 isManualMode = !isManualMode;
+                if (isManualMode) {
+                    manualIdleOverride = false;
+                }
             }
             lastLeftBumperState = currentLeftBumperState;
 
-            // D-Pad：手动模式下选择目标距离 (复用解算)
             if (isManualMode) {
-                if (gamepad1.dpad_left) manualTargetDistance = 25.0;
-                else if (gamepad1.dpad_up) manualTargetDistance = 54.23;
-                else if (gamepad1.dpad_right) manualTargetDistance = 88;
-                else if (gamepad1.dpad_down) manualTargetDistance = 150.0;
+                if (gamepad1.dpad_left) { manualTargetDistance = 25.0; manualIdleOverride = false; }
+                else if (gamepad1.dpad_up) { manualTargetDistance = 54.23; manualIdleOverride = false; }
+                else if (gamepad1.dpad_right) { manualTargetDistance = 88.0; manualIdleOverride = false; }
+                else if (gamepad1.dpad_down) { manualTargetDistance = 150.0; manualIdleOverride = false; }
             }
 
             // Right Bumper：紧急刹车锁死，长按生效
@@ -190,16 +194,16 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
                 }
             } else {
                 bbb.setPosition(0);
-                if (isPreSpooling && aimCommand.hasTarget) {
+                if (isManualMode && !manualIdleOverride && aimCommand.hasTarget) {
+                    targetVelocityRPM = aimCommand.targetRpm;
+                    flywheelActionState = "手动档持续预热 (Manual Spooling)";
+                } else if (isPreSpooling && aimCommand.hasTarget) {
                     targetVelocityRPM = aimCommand.targetRpm;
                     flywheelActionState = "战斗姿态预蓄力 (Pre-spooling)";
+                } else {
+                    targetVelocityRPM = IDLE_VELOCITY;
+                    flywheelActionState = "怠速 (Idle)";
                 }
-            }
-
-            // 手动模式未射击时，强制锁定 3000RPM
-            if (isManualMode && !isShootingMode) {
-                targetVelocityRPM = IDLE_VELOCITY;
-                flywheelActionState = "手动档怠速 (3000 RPM Locked)";
             }
 
             double dynamicTolerance;
@@ -215,7 +219,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             double currentRPM = (currentVelTPS * 60.0) / TICKS_PER_REV;
             double errorRPM = targetVelocityRPM - currentRPM;
 
-            if (!isShootingMode && !isPreSpooling && (!isManualMode || !isShootingMode)) {
+            if (!isShootingMode && !isPreSpooling && (!isManualMode || manualIdleOverride)) {
                 isFlywheelReady = false;
             } else {
                 if (!isFlywheelReady) {
@@ -248,7 +252,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             double bangBangThreshold = Math.max(50.0, Math.abs(dynamicTolerance) - (Math.abs(dynamicTolerance) / 7.0));
             String activeBoost = "None";
 
-            if ((isShootingMode || isPreSpooling) && targetVelocityRPM > 100) {
+            if ((isShootingMode || isPreSpooling || (isManualMode && !manualIdleOverride)) && targetVelocityRPM > 100) {
                 if (errorRPM > bangBangThreshold) {
                     power = 1.0; integralSum = 0; activeBoost = "Bang-Bang (极速补电)";
                 }

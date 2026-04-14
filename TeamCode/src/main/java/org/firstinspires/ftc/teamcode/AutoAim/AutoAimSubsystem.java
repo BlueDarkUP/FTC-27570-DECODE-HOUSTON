@@ -133,10 +133,11 @@ public class AutoAimSubsystem {
     private double lastError = 0;
     private boolean wasInStage1 = false;
 
-    // 手动模式积分器
+    // 手动模式积分器与刹车锁
     private double manualIntegralSum = 0;
     private double manualLastError = 0;
     private boolean manualWasInStage1 = false;
+    private boolean isManualBrakeLocked = false; // 新增：手动档云台到达零度死区后永远锁死直到退出手动档
 
     private String currentStageName = "IDLE";
     private ElapsedTime pidTimer = new ElapsedTime();
@@ -368,6 +369,7 @@ public class AutoAimSubsystem {
             if (turretMotor != null) turretMotor.setPower(0);
             integralSum = 0; lastError = 0;
             manualIntegralSum = 0; manualLastError = 0;
+            isManualBrakeLocked = false; // 解除手动锁
             currentStageName = "【紧急刹车锁死】";
             currentTurretPower = 0;
             command.hasTarget = false; // 会强制让发射和预蓄力也停止
@@ -398,37 +400,45 @@ public class AutoAimSubsystem {
             double dtPID = Math.max(pidTimer.seconds(), 0.001);
             double power = 0.0;
 
-            // 你的双段 PID 状态机
-            if (absError <= MANUAL_ERROR_TOLERANCE) {
+            // 修改为到达死区后永久锁死逻辑
+            if (isManualBrakeLocked) {
+                // 如果已经进入刹车锁死状态，则保持0输出（利用硬件BRAKE模式锁死）
                 power = 0;
-                manualIntegralSum = 0;
-                currentStageName = "【手动到达】(死区)";
-                manualWasInStage1 = false;
-            }
-            else if (absError > MANUAL_STAGE_THRESHOLD) {
-                currentStageName = "【手动一段】(极速回正)";
-                manualWasInStage1 = true;
-                manualIntegralSum += error * dtPID;
-                double derivative = (error - manualLastError) / dtPID;
-                power = (kP_far_manual * error) + (kI_far_manual * manualIntegralSum) + (kD_far_manual * derivative);
-            }
-            else {
-                currentStageName = "【手动二段】(近距精调)";
-                if (manualWasInStage1 || Math.signum(error) != Math.signum(manualLastError)) {
+                currentStageName = "【手动到达锁定】(BRAKE)";
+            } else {
+                if (absError <= MANUAL_ERROR_TOLERANCE) {
+                    // 首次进入容差范围，立刻锁死
+                    isManualBrakeLocked = true;
+                    power = 0;
                     manualIntegralSum = 0;
+                    currentStageName = "【手动到达锁定】(BRAKE)";
                     manualWasInStage1 = false;
                 }
-                if (absError < I_ZONE_near_manual) {
+                else if (absError > MANUAL_STAGE_THRESHOLD) {
+                    currentStageName = "【手动一段】(极速回正)";
+                    manualWasInStage1 = true;
                     manualIntegralSum += error * dtPID;
-                    double maxISum = MANUAL_MAX_INTEGRAL_POWER / (kI_near_manual == 0 ? 1 : kI_near_manual);
-                    manualIntegralSum = Math.max(-maxISum, Math.min(maxISum, manualIntegralSum));
-                } else {
-                    manualIntegralSum = 0;
+                    double derivative = (error - manualLastError) / dtPID;
+                    power = (kP_far_manual * error) + (kI_far_manual * manualIntegralSum) + (kD_far_manual * derivative);
                 }
-                double derivative = (error - manualLastError) / dtPID;
-                double pidPower = (kP_near_manual * error) + (kI_near_manual * manualIntegralSum) + (kD_near_manual * derivative);
-                double feedforward = Math.signum(error) * kS_near_manual;
-                power = pidPower + feedforward;
+                else {
+                    currentStageName = "【手动二段】(近距精调)";
+                    if (manualWasInStage1 || Math.signum(error) != Math.signum(manualLastError)) {
+                        manualIntegralSum = 0;
+                        manualWasInStage1 = false;
+                    }
+                    if (absError < I_ZONE_near_manual) {
+                        manualIntegralSum += error * dtPID;
+                        double maxISum = MANUAL_MAX_INTEGRAL_POWER / (kI_near_manual == 0 ? 1 : kI_near_manual);
+                        manualIntegralSum = Math.max(-maxISum, Math.min(maxISum, manualIntegralSum));
+                    } else {
+                        manualIntegralSum = 0;
+                    }
+                    double derivative = (error - manualLastError) / dtPID;
+                    double pidPower = (kP_near_manual * error) + (kI_near_manual * manualIntegralSum) + (kD_near_manual * derivative);
+                    double feedforward = Math.signum(error) * kS_near_manual;
+                    power = pidPower + feedforward;
+                }
             }
 
             power = Math.max(-1.0, Math.min(1.0, power));
@@ -439,6 +449,7 @@ public class AutoAimSubsystem {
 
         } else {
             // == 原始自动自瞄模式 ==
+            isManualBrakeLocked = false;
             // 清理手动档状态
             manualIntegralSum = 0;
             manualLastError = 0;
