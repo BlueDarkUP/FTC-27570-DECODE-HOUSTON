@@ -36,13 +36,12 @@ public class FullRoutineDoorExtractAuto extends OpMode {
     private Servo LP;  // 俯仰舵机 LP
     private Servo RP;  // 俯仰舵机 RP
 
-    // ==========================================================
-    // === 2. 计时器与状态机变量 ===
-    // ==========================================================
     private Timer pathTimer;
     private Timer opmodeTimer;
-    private Timer cycleTimer;
     private int pathState;
+
+    private final int MAX_DOOR_EXTRACT_LOOPS = 3; // ★ 在这里修改循环次数 (3次)
+    private int doorExtractLoopCount = 0;
 
     // ==========================================================
     // === 3. 云台双段 PIDF 参数与状态变量 ===
@@ -455,32 +454,39 @@ public class FullRoutineDoorExtractAuto extends OpMode {
             case 10:
                 follower.setMaxPower(0.7);
                 follower.followPath(diyigepaoda, false);
-                turretTargetAngle = -50.0;  // ★ 起点：云台设置到 -60 度
-                flywheelTargetRPM = 4000.0; // 起点：飞轮4000转
+                turretTargetAngle = -50.0;
+                flywheelTargetRPM = 4000.0;
                 intakeMotor.setPower(0.0);
                 setPathState(11);
                 break;
             case 11:
-                // 非阻塞等待 0.4 秒后，一边跑一边盲射
                 if (pathTimer.getElapsedTimeSeconds() >= 1.6) {
-                    startBlindShoot(1); // 持续 0.7 秒
+                    startBlindShoot(1);
                     setPathState(12);
                 }
                 break;
             case 12:
-                // 等待路径跑完
+                if (!isShootingActive()) {
+                    follower.setMaxPower(1.0);
+                    setPathState(13);
+                }
+                else if (!follower.isBusy()) {
+                    follower.setMaxPower(1.0);
+                    setPathState(20);
+                }
+                break;
+            case 13:
                 if (!follower.isBusy()) {
                     setPathState(20);
                 }
                 break;
 
-            // ================= 2. 吸第二排 (xidierpai) =================
             case 20:
                 follower.setMaxPower(1);
                 follower.followPath(xidierpai, false);
-                bbb.setPosition(0.0);       // ★ 全程关闭挡板
-                intakeMotor.setPower(1.0);  // ★ 开启吸取
-                flywheelTargetRPM = 3400; // 降速以节约电能
+                bbb.setPosition(0.0);
+                intakeMotor.setPower(1.0);
+                flywheelTargetRPM = 3400;
                 setPathState(21);
                 break;
             case 21:
@@ -509,7 +515,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 break;
             case 32:
                 if (!isShootingActive()) {
-                    cycleTimer.resetTimer(); // 从这里开始重置开门15秒计算器
+                    doorExtractLoopCount = 0;
                     setPathState(40);
                 }
                 break;
@@ -555,11 +561,12 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 break;
             case 52:
                 if (!isShootingActive()) {
-                    // 判断15秒限制时间
-                    if (cycleTimer.getElapsedTimeSeconds() < 15.0) {
-                        setPathState(40); // 重新返回开门嘬
+                    doorExtractLoopCount++;
+
+                    if (doorExtractLoopCount < MAX_DOOR_EXTRACT_LOOPS) {
+                        setPathState(40);
                     } else {
-                        setPathState(60); // 超时跳出，吸第一排
+                        setPathState(60);
                     }
                 }
                 break;
@@ -679,11 +686,11 @@ public class FullRoutineDoorExtractAuto extends OpMode {
     public void init() {
         pathTimer = new Timer();
         opmodeTimer = new Timer();
-        cycleTimer = new Timer();
         pidTimer = new ElapsedTime();
         flywheelTimer = new ElapsedTime();
         shootTimer = new ElapsedTime();
 
+        doorExtractLoopCount = 0;
         intakeMotor = hardwareMap.get(DcMotorEx.class, "Intake");
         intakeMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
 
@@ -739,23 +746,20 @@ public class FullRoutineDoorExtractAuto extends OpMode {
 
     @Override
     public void loop() {
-        // 1. 设置系统硬性姿态要求
-        setPitchServos(0.8); // ★ 全程保持俯仰角 0.7
+        setPitchServos(0.8);
 
-        // 2. 底盘路径与状态更新
         follower.update();
         autonomousPathUpdate();
 
-        // 3. 执行所有 PID 闭环动作
         updateTurret();
         updateFlywheel();
 
-        // 4. 射击控制硬件覆盖（★必须放最后以覆盖基础 intake 指令）
         updateShootingSequence();
 
         telemetry.addData("Path State", pathState);
         telemetry.addData("Shoot Mode", currentShootMode);
         telemetry.addData("RPM Current/Target", "%.1f / %.1f", flywheelCurrentRPM, flywheelTargetRPM);
+        telemetry.addData("Door Loop Progress", "%d / %d", doorExtractLoopCount, MAX_DOOR_EXTRACT_LOOPS);
         telemetry.update();
     }
 
