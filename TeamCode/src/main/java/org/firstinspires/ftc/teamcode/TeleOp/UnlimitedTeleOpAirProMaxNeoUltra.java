@@ -16,8 +16,8 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.teamcode.AutoAim.AutoAimSubsystem;
 
-@TeleOp(name = "AutoAim Integrated TeleOp", group = "Competition")
-public class AutoAimTeleOp extends LinearOpMode {
+@TeleOp(name = "Unlimited TeleOp AirProMaxNeoSuperUltra", group = "Competition")
+public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
     // ================= 硬件声明 =================
     private DcMotor lf = null;
@@ -40,6 +40,9 @@ public class AutoAimTeleOp extends LinearOpMode {
     private final double TARGET_Y_WORLD = 135.0;
 
     private final double IDLE_VELOCITY = 3000.0;
+
+    // 【新增】左扳机 (Left Trigger) 预蓄力死区
+    private final double TRIGGER_DEADZONE = 0.3;
 
     // 引入线性映射的动态容差参数：转速越高，要求越严，容差越小
     private final double RPM_LOWER_BOUND = 3000.0;
@@ -68,7 +71,7 @@ public class AutoAimTeleOp extends LinearOpMode {
     private boolean isShootingMode = false;
     private boolean lastCircleState = false;
 
-    // 新增：记录飞轮是否已经蓄力完成的状态标志
+    // 记录飞轮是否已经蓄力完成的状态标志
     private boolean isFlywheelReady = false;
 
     private double intakeBrakeReleaseTime = 0.0;
@@ -161,7 +164,8 @@ public class AutoAimTeleOp extends LinearOpMode {
             }
             lastCircleState = currentCircleState;
 
-            // 将 isShootingMode 传入底层，非射击模式下将自动切断 kA，消除闲置时的震荡
+            boolean isPreSpooling = gamepad1.left_trigger > TRIGGER_DEADZONE;
+
             AutoAimSubsystem.TurretCommand aimCommand = autoAim.update(TARGET_X_WORLD, TARGET_Y_WORLD, isShootingMode);
 
             if (aimCommand.hasTarget) {
@@ -169,13 +173,20 @@ public class AutoAimTeleOp extends LinearOpMode {
             }
 
             double targetVelocityRPM = IDLE_VELOCITY;
+            String flywheelActionState = "怠速 (Idle)";
+
             if (isShootingMode) {
                 bbb.setPosition(0.18);
                 if (aimCommand.hasTarget) {
                     targetVelocityRPM = aimCommand.targetRpm;
+                    flywheelActionState = "开火中 (Shooting)";
                 }
             } else {
                 bbb.setPosition(0);
+                if (isPreSpooling && aimCommand.hasTarget) {
+                    targetVelocityRPM = aimCommand.targetRpm;
+                    flywheelActionState = "战斗姿态预蓄力 (Pre-spooling)";
+                }
             }
 
             double dynamicTolerance;
@@ -193,7 +204,7 @@ public class AutoAimTeleOp extends LinearOpMode {
             double currentRPM = (currentVelTPS * 60.0) / TICKS_PER_REV;
             double errorRPM = targetVelocityRPM - currentRPM;
 
-            if (!isShootingMode) {
+            if (!isShootingMode && !isPreSpooling) {
                 isFlywheelReady = false;
             } else {
                 if (!isFlywheelReady) {
@@ -231,10 +242,10 @@ public class AutoAimTeleOp extends LinearOpMode {
 
             double power = (kF * targetVelTPS) + (kP * errorTPS) + (kI * integralSum) + (kD * derivative);
 
-            double bangBangThreshold = Math.abs(dynamicTolerance) - (Math.abs(dynamicTolerance) / 7.0);
+            double bangBangThreshold = Math.max(50.0, Math.abs(dynamicTolerance) - (Math.abs(dynamicTolerance) / 7.0));
             String activeBoost = "None";
 
-            if (isShootingMode && targetVelocityRPM > 100) {
+            if ((isShootingMode || isPreSpooling) && targetVelocityRPM > 100) {
                 if (errorRPM > bangBangThreshold) {
                     power = 1.0;
                     integralSum = 0;
@@ -311,8 +322,11 @@ public class AutoAimTeleOp extends LinearOpMode {
 
             wasUnwinding = aimCommand.isUnwinding;
 
-            telemetry.addData("当前模式", isShootingMode ? "[ 发射模式 ]" : "[ 怠速模式 ]");
+            telemetry.addData("当前模式", isShootingMode ? "[ 发射模式 ]" : "[ 怠速/收集模式 ]");
+            telemetry.addData("左扳机 (LT) 深度", "%.2f (激活死区 > %.2f)", gamepad1.left_trigger, TRIGGER_DEADZONE);
+            telemetry.addData("飞轮动作策略", flywheelActionState);
             telemetry.addData("瞬态接管状态", activeBoost);
+
             if (aimCommand.hasTarget) {
                 telemetry.addData("Pitch 舵机", "LP: %.3f | RP: %.3f", LP.getPosition(), RP.getPosition());
             }
@@ -320,7 +334,7 @@ public class AutoAimTeleOp extends LinearOpMode {
             telemetry.addData("飞轮目标 RPM", targetVelocityRPM);
             telemetry.addData("RPM 误差", errorRPM);
 
-            telemetry.addData("飞轮状态", isFlywheelReady ? "✅ 已满转 (允许掉速射击)" : "⏳ 蓄力中 (等待达到满转)...");
+            telemetry.addData("飞轮状态", isFlywheelReady ? "✅ 已满转 (允许射击)" : "⏳ 蓄力中 (未达到目标)...");
             telemetry.addData("允许最大掉速 (容差)", "-%.1f RPM", dynamicTolerance);
 
             telemetry.addData("极速补电触发线", "> %.1f", bangBangThreshold);

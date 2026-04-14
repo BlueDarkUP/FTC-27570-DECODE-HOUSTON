@@ -23,6 +23,10 @@ public class AutoAimSubsystem {
     private Telemetry telemetry;
     private DcMotorEx turretMotor;
 
+    // ===== 新增：自动阶段外部数据注入 =====
+    private boolean isAutonomousMode = false;
+    private double extX, extY, extH, extVx, extVy, extOmega;
+
     public static double FIELD_OFFSET_X = 72.0;
     public static double FIELD_OFFSET_Y = 72.0;
     public static double TURRET_OFFSET_FWD = -1.22;
@@ -71,7 +75,7 @@ public class AutoAimSubsystem {
 
     public static double FILTER_RPM_3 = 4900.0;
     public static double FILTER_KA_3 = 0.10;
-    public static double FILTER_D_3 = 0.25;
+    public static double FILTER_D_3 = 0.15;
 
     public static double STAGE_THRESHOLD = 30.0;
 
@@ -161,14 +165,26 @@ public class AutoAimSubsystem {
         public boolean isAimLocked = false;
     }
 
+    // ====== 保留给 TeleOp 的构造函数 ======
     public AutoAimSubsystem(HardwareMap hardwareMap, Telemetry telemetry) {
+        this(hardwareMap, telemetry, false);
+    }
+
+    // ====== 新增给 Auto 用的重载构造函数 ======
+    public AutoAimSubsystem(HardwareMap hardwareMap, Telemetry telemetry, boolean isAutonomousMode) {
         this.telemetry = telemetry;
-        try {
-            robotPose = new PinpointPoseProvider(hardwareMap, "odo");
-            robotPose.initialize();
-        } catch (Exception e) {
-            telemetry.addLine("[FATAL] Chassis ODO missing.");
+        this.isAutonomousMode = isAutonomousMode;
+
+        // 核心修复：如果是自动模式，绝对不去初始化 Pinpoint！让 Pedro Pathing 独占！
+        if (!isAutonomousMode) {
+            try {
+                robotPose = new PinpointPoseProvider(hardwareMap, "odo");
+                robotPose.initialize();
+            } catch (Exception e) {
+                telemetry.addLine("[FATAL] Chassis ODO missing.");
+            }
         }
+
         try {
             ll = hardwareMap.get(Limelight3A.class, "limelight");
             ll.pipelineSwitch(0);
@@ -196,6 +212,16 @@ public class AutoAimSubsystem {
         }
 
         pidTimer.reset();
+    }
+
+    // ===== 新增：接收底盘外部数据 =====
+    public void updateExternalOdometry(double x, double y, double h, double vx, double vy, double omega) {
+        this.extX = x;
+        this.extY = y;
+        this.extH = h;
+        this.extVx = vx;
+        this.extVy = vy;
+        this.extOmega = omega;
     }
 
     private OdoRecord getHistoricalPose(long targetTimeNano) {
@@ -236,23 +262,35 @@ public class AutoAimSubsystem {
 
     public TurretCommand update(double targetX, double targetY, boolean isShootingMode) {
         TurretCommand command = new TurretCommand();
-        if (robotPose == null) return command;
 
         long currentNanoTime = System.nanoTime();
         if (lastLoopTime == 0) lastLoopTime = currentNanoTime;
 
-        robotPose.update();
         if (turretPose != null) turretPose.update();
 
-        double rawX = -robotPose.getX(DistanceUnit.INCH);
-        double rawY = robotPose.getY(DistanceUnit.INCH);
-        double rawH_Rad = robotPose.getHeading(AngleUnit.RADIANS);
+        double rawX, rawY, rawH_Rad, rVx, rVy, rOmegaRad;
 
-        double rVx = -robotPose.getXVelocity(DistanceUnit.INCH);
-        double rVy = robotPose.getYVelocity(DistanceUnit.INCH);
-        double rOmegaRad = robotPose.getHeadingVelocity(AngleUnit.RADIANS);
-        double rOmegaDeg = Math.toDegrees(rOmegaRad);
+        // 核心修复：根据模式选择数据来源
+        if (isAutonomousMode) {
+            rawX = extX;
+            rawY = extY;
+            rawH_Rad = extH;
+            rVx = extVx;
+            rVy = extVy;
+            rOmegaRad = extOmega;
+        } else {
+            if (robotPose == null) return command;
+            robotPose.update();
+            rawX = -robotPose.getX(DistanceUnit.INCH);
+            rawY = robotPose.getY(DistanceUnit.INCH);
+            rawH_Rad = robotPose.getHeading(AngleUnit.RADIANS);
+            rVx = -robotPose.getXVelocity(DistanceUnit.INCH);
+            rVy = robotPose.getYVelocity(DistanceUnit.INCH);
+            rOmegaRad = robotPose.getHeadingVelocity(AngleUnit.RADIANS);
+        }
+
         double speed = Math.hypot(rVx, rVy);
+        double rOmegaDeg = Math.toDegrees(rOmegaRad);
 
         poseBuffer[poseBufferIndex].timestampNano = currentNanoTime;
         poseBuffer[poseBufferIndex].rawX = rawX;
@@ -569,21 +607,20 @@ public class AutoAimSubsystem {
     }
 
     public void setInitialPose(Pose2D pose) {
-        if (robotPose != null) {
+        if (!isAutonomousMode && robotPose != null) {
             robotPose.setPose(pose);
             robotPose.update();
-
-            visionOffsetX = 0;
-            visionOffsetY = 0;
-            visionOffsetH_Rad = 0;
-
-            for(int i = 0; i < POSE_BUFFER_SIZE; i++) {
-                if (poseBuffer[i] != null) {
-                    poseBuffer[i].timestampNano = 0;
-                }
-            }
-
-            telemetry.addData("[System]", "Odometry & Offsets Fully Reset");
         }
+
+        visionOffsetX = 0;
+        visionOffsetY = 0;
+        visionOffsetH_Rad = 0;
+
+        for(int i = 0; i < POSE_BUFFER_SIZE; i++) {
+            if (poseBuffer[i] != null) {
+                poseBuffer[i].timestampNano = 0;
+            }
+        }
+        telemetry.addData("[System]", "Offsets Fully Reset");
     }
 }
