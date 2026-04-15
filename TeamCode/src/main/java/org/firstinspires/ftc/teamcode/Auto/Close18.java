@@ -1,7 +1,5 @@
 package org.firstinspires.ftc.teamcode.Auto;
 
-import static android.os.SystemClock.sleep;
-
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierCurve;
 import com.pedropathing.geometry.BezierLine;
@@ -18,8 +16,8 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
-@Autonomous(name = "Full Routine with Door Extract Loop", group = "Autonomous")
-public class FullRoutineDoorExtractAuto extends OpMode {
+@Autonomous(name = "近点18球自动（嘬2吸三）", group = "Autonomous")
+public class Close18 extends OpMode {
 
     private Follower follower;
     private DcMotorEx intakeMotor;
@@ -103,8 +101,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
     public PathChain fashediyipai;
     public PathChain zhunbeixidisanpai;
     public PathChain xidisanpai;
-    public PathChain fashedisanpai;
-    public PathChain tingkao;
+    public PathChain Returntofixedlaunchpoint;
 
     private final Pose startPose = new Pose(35.000, 134.600, Math.toRadians(180));
 
@@ -145,7 +142,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                         new BezierCurve(
                                 new Pose(60.000, 83.000),
                                 new Pose(45.000, 60.000),
-                                new Pose(12.3, 59.8)
+                                new Pose(12.3, 58)
                         )
                 )
                 .setLinearHeadingInterpolation(Math.toRadians(226), Math.toRadians(150))
@@ -154,7 +151,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
         fashekaimenzuo = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(12.3, 59.8),
+                                new Pose(12.3, 58),
                                 new Pose(35.000, 47.000),
                                 new Pose(60.000, 83.000)
                         )
@@ -197,7 +194,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 .addPath(
                         new BezierLine(
                                 new Pose(60.000, 83.000),
-                                new Pose(45.000, 36.000)
+                                new Pose(50.000, 36.000)
                         )
                 )
                 .setLinearHeadingInterpolation(Math.toRadians(230), Math.toRadians(180))
@@ -207,32 +204,21 @@ public class FullRoutineDoorExtractAuto extends OpMode {
         xidisanpai = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(45.000, 36.000),
+                                new Pose(50.000, 36.000),
                                 new Pose(12.000, 36.000)
                         )
                 )
                 .setTangentHeadingInterpolation()
                 .build();
 
-        fashedisanpai = follower.pathBuilder()
-                .addPath(
-                        new BezierCurve(
-                                new Pose(12.000, 36.000),
-                                new Pose(47.308, 32.731),
-                                new Pose(60.000, 83.000)
-                        )
-                )
-                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(250))
-                .build();
-
-        tingkao = follower.pathBuilder()
+        Returntofixedlaunchpoint = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(60.000, 83.000),
-                                new Pose(60.000, 56.000)
+                                new Pose(13.000, 35.800),
+                                new Pose(59.923, 107.923)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(250), Math.toRadians(90))
+                .setConstantHeadingInterpolation(Math.toRadians(180))
                 .build();
     }
 
@@ -597,8 +583,8 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 break;
 
             case 110:
-                follower.followPath(fashedisanpai, true);
-                turretTargetAngle = -113.0;
+                follower.followPath(Returntofixedlaunchpoint, true);
+                turretTargetAngle = -27.0;
                 flywheelTargetRPM = 3250.0;
                 intakeMotor.setPower(0.0);
                 setPathState(111);
@@ -619,7 +605,6 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 break;
 
             case 120:
-                follower.followPath(tingkao, true);
                 turretTargetAngle = 0.0;
                 flywheelTargetRPM = 0.0;
                 intakeMotor.setPower(0.0);
@@ -627,9 +612,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 setPathState(121);
                 break;
             case 121:
-                if (!follower.isBusy()) {
-                    setPathState(-1);
-                }
+                setPathState(-1);
                 break;
         }
     }
