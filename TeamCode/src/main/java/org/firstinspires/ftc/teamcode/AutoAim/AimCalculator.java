@@ -9,22 +9,22 @@ public class AimCalculator {
     public static double P1_DIST = 21.0;
     public static double P1_RPM = 2800;
     public static double P1_PITCH = 0.35;
-    public static double P1_TIME = 0.3;
+    public static double P1_TIME = 0.4;
 
     public static double P2_DIST = 60.0;
     public static double P2_RPM = 3200;
     public static double P2_PITCH = 0.70;
-    public static double P2_TIME = 0.4;
+    public static double P2_TIME = 0.5;
 
     public static double P3_DIST = 67.1;
     public static double P3_RPM = 3250;
     public static double P3_PITCH = 0.78;
-    public static double P3_TIME = 0.5;
+    public static double P3_TIME = 0.6;
 
     public static double P4_DIST = 89.2;
     public static double P4_RPM = 3800;
     public static double P4_PITCH = 1.0;
-    public static double P4_TIME = 0.5;
+    public static double P4_TIME = 0.7;
 
     public static double P5_DIST = 104.6;
     public static double P5_RPM = 3900;

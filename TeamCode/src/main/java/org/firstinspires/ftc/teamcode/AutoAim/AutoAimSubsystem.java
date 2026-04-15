@@ -17,119 +17,6 @@ import org.firstinspires.ftc.teamcode.Driver.EchoLapse.PinpointPoseProvider;
 @Config
 public class AutoAimSubsystem {
 
-    // --------------------------------------------------------
-    // 【DASHBOARD 参数分组区域】
-    // 将变量放入 public static class 中即可在 Dashboard 中生成折叠文件夹
-    // --------------------------------------------------------
-
-    public static class Offsets {
-        public static double FIELD_OFFSET_X = 72.0;
-        public static double FIELD_OFFSET_Y = 72.0;
-        public static double TURRET_OFFSET_FWD = -1.22;
-        public static double TURRET_OFFSET_LEFT = 0.0;
-        public static double TURRET_START_OFFSET_DEG = 0;
-    }
-
-    public static class HWLimit {
-        public static double TURRET_SOFT_LIMIT_CCW = 175.0;
-        public static double TURRET_SOFT_LIMIT_CW = -210.0;
-        public static double TURRET_TICKS_PER_REV = 32798;
-        public static double TICKS_PER_DEGREE = 32798 / 360.0;
-
-        public static double MAX_PHYSICAL_ACCEL = 10000;
-        public static double IMPACT_COOLDOWN_MS = 100;
-        public static double ALPHA_NORMAL = 0.55;
-        public static double ALPHA_IMPACT = 0.05;
-    }
-
-    public static class LLConfig {
-        public static double LL_MAX_TRUST_SPEED = 15.0;
-        public static double LL_MAX_TRUST_DISTANCE = 100.0;
-        public static double LL_MAX_STALENESS_MS = 100.0;
-
-        public static double LL_MULTI_TAG_POS_WEIGHT = 0.8;
-        public static double LL_MULTI_TAG_HEADING_WEIGHT = 0.1;
-        public static double LL_SINGLE_TAG_BASE_POS_WEIGHT = 0.6;
-        public static double LL_SINGLE_TAG_BASE_HEADING_WEIGHT = 0.02;
-        public static double LL_MAX_SINGLE_TAG_DIST_M = 3;
-
-        public static double LL_MAX_TELEPORT_INCHES = 15.0;
-    }
-
-    public static class AimConfig {
-        public static double TARGET_HITBOX_WIDTH_INCHES = 16;
-        public static double MAX_AIM_ANGLE_TOLERANCE = 8.5;
-        public static double TARGET_SLEW_RATE_DEG_PER_SEC = 600.0;
-
-        public static double kV_TURRET = 0.00055;
-        public static double kA_TURRET = 0.00043;
-        public static double PID_DEADBAND_DEG = 0.3;
-    }
-
-    public static class FilterMap {
-        public static double FILTER_RPM_1 = 2800.0;
-        public static double FILTER_KA_1 = 0.85;
-        public static double FILTER_D_1 = 0.90;
-
-        public static double FILTER_RPM_2 = 3800.0;
-        public static double FILTER_KA_2 = 0.60;
-        public static double FILTER_D_2 = 0.70;
-
-        public static double FILTER_RPM_3 = 4900.0;
-        public static double FILTER_KA_3 = 0.10;
-        public static double FILTER_D_3 = 0.15;
-    }
-
-    public static class AutoPID {
-        public static double STAGE_THRESHOLD = 30.0;
-        public static double ERROR_TOLERANCE = 0.3;
-        public static double MAX_INTEGRAL_POWER = 0.08;
-
-        public static double kP_far = 0.05;
-        public static double kI_far = 0.00;
-        public static double kD_far = 0.00005;
-
-        public static double kP_near = 0.03;
-        public static double kI_near = 0.00;
-        public static double kD_near = 0.0005;
-        public static double kS_near = 0.0;
-        public static double I_ZONE_near = 3.0;
-    }
-
-    public static class UnwindPID {
-        public static double STAGE_THRESHOLD_UNWIND = 80.0;
-
-        public static double kP_far_unwind = 1;
-        public static double kI_far_unwind = 0.0;
-        public static double kD_far_unwind = 0.0;
-
-        public static double kP_near_unwind = 0.025;
-        public static double kI_near_unwind = 0.01;
-        public static double kD_near_unwind = 0.0015;
-        public static double kS_near_unwind = 0.0;
-        public static double I_ZONE_near_unwind = 5.0;
-    }
-
-    public static class ManualPID {
-        public static double MANUAL_STAGE_THRESHOLD = 14.0;
-        public static double MANUAL_MAX_INTEGRAL_POWER = 0.08;
-        public static double MANUAL_ERROR_TOLERANCE = 0.3;
-
-        public static double kP_far_manual = 0.05;
-        public static double kI_far_manual = 0.00;
-        public static double kD_far_manual = 0.0003;
-
-        public static double kP_near_manual = 0.00002;
-        public static double kI_near_manual = 0.0001;
-        public static double kD_near_manual = 0.0015;
-        public static double kS_near_manual = 0.28;
-        public static double I_ZONE_near_manual = 3.0;
-    }
-
-    // --------------------------------------------------------
-    // 【系统内部变量】
-    // --------------------------------------------------------
-
     private PinpointPoseProvider robotPose;
     private PinpointPoseProvider turretPose;
     private Limelight3A ll;
@@ -139,8 +26,97 @@ public class AutoAimSubsystem {
     private boolean isAutonomousMode = false;
     private double extX, extY, extH, extVx, extVy, extOmega;
 
+    public static double FIELD_OFFSET_X = 72.0;
+    public static double FIELD_OFFSET_Y = 72.0;
+    public static double TURRET_OFFSET_FWD = -1.22;
+    public static double TURRET_OFFSET_LEFT = 0.0;
+
+    public static double TURRET_SOFT_LIMIT_CCW = 173.0;
+    public static double TURRET_SOFT_LIMIT_CW = -210.0;
+    public static double TURRET_START_OFFSET_DEG = 0;
+
+    public static double TURRET_TICKS_PER_REV = 32798;
+    public static double TICKS_PER_DEGREE = 32798 / 360.0;
+
+    public static double MAX_PHYSICAL_ACCEL = 10000;
+    public static double IMPACT_COOLDOWN_MS = 100;
+
+    public static double ALPHA_NORMAL = 0.55;
+    public static double ALPHA_IMPACT = 0.05;
+
+    public static double LL_MAX_TRUST_SPEED = 10.0;
+    public static double LL_MAX_TRUST_DISTANCE = 120.0;
+    public static double LL_MAX_STALENESS_MS = 1145.0;
+
+    public static double LL_MULTI_TAG_POS_WEIGHT = 0.9;
+    public static double LL_MULTI_TAG_HEADING_WEIGHT = 0.6;
+    public static double LL_SINGLE_TAG_BASE_POS_WEIGHT = 0.8;
+    public static double LL_SINGLE_TAG_BASE_HEADING_WEIGHT = 0.5;
+    public static double LL_MAX_SINGLE_TAG_DIST_M = 3;
+
+    public static double LL_MAX_TELEPORT_INCHES = 15.0;
+
+    public static double TARGET_HITBOX_WIDTH_INCHES = 16;
+    public static double MAX_AIM_ANGLE_TOLERANCE = 8.5;
+
+    public static double kV_TURRET = 0.0025;
+    public static double kA_TURRET = 0.00037;
+
+    public static double PID_DEADBAND_DEG = 1;
+
+    public static double FILTER_RPM_1 = 2800.0;
+    public static double FILTER_KA_1 = 0.7;
+    public static double FILTER_D_1 = 0.6;
+
+    public static double FILTER_RPM_2 = 3800.0;
+    public static double FILTER_KA_2 = 0.50;
+    public static double FILTER_D_2 = 0.40;
+
+    public static double FILTER_RPM_3 = 4900.0;
+    public static double FILTER_KA_3 = 0.10;
+    public static double FILTER_D_3 = 0.1;
+
+    public static double TARGET_SLEW_RATE_DEG_PER_SEC = 600.0;
     private double profiledTargetDeg = Double.NaN;
     private double lastEncoderDegForDeriv = 0.0;
+
+    public static double STAGE_THRESHOLD = 30.0;
+    public static double kP_far = 0.06;
+    public static double kI_far = 0.00;
+    public static double kD_far = 0.00;
+
+    public static double kP_near = 0.035;
+    public static double kI_near = 0.00;
+    public static double kD_near = 0.0005;
+    public static double kS_near = 0.0;
+    public static double I_ZONE_near = 3.0;
+
+    public static double STAGE_THRESHOLD_UNWIND = 60.0;
+    public static double kP_far_unwind = 1;
+    public static double kI_far_unwind = 0.0;
+    public static double kD_far_unwind = 0.0;
+
+    public static double kP_near_unwind = 0.025;
+    public static double kI_near_unwind = 0.01;
+    public static double kD_near_unwind = 0.0015;
+    public static double kS_near_unwind = 0.0;
+    public static double I_ZONE_near_unwind = 5.0;
+
+    public static double MAX_INTEGRAL_POWER = 0.08;
+    public static double ERROR_TOLERANCE = 0.3;
+
+    public static double MANUAL_STAGE_THRESHOLD = 14.0;
+    public static double kP_far_manual = 0.05;
+    public static double kI_far_manual = 0.00;
+    public static double kD_far_manual = 0.0003;
+
+    public static double kP_near_manual = 0.00002;
+    public static double kI_near_manual = 0.0001;
+    public static double kD_near_manual = 0.0015;
+    public static double kS_near_manual = 0.28;
+    public static double I_ZONE_near_manual = 3.0;
+    public static double MANUAL_MAX_INTEGRAL_POWER = 0.08;
+    public static double MANUAL_ERROR_TOLERANCE = 0.2;
 
     private long lastLoopTime = 0;
     private double lastRawVxField = 0, lastRawVyField = 0;
@@ -260,14 +236,14 @@ public class AutoAimSubsystem {
     }
 
     private double[] getDynamicFilters(double targetRpm) {
-        if (targetRpm <= FilterMap.FILTER_RPM_1) return new double[]{FilterMap.FILTER_KA_1, FilterMap.FILTER_D_1};
-        if (targetRpm >= FilterMap.FILTER_RPM_3) return new double[]{FilterMap.FILTER_KA_3, FilterMap.FILTER_D_3};
-        if (targetRpm < FilterMap.FILTER_RPM_2) {
-            double ratio = (targetRpm - FilterMap.FILTER_RPM_1) / (FilterMap.FILTER_RPM_2 - FilterMap.FILTER_RPM_1);
-            return new double[]{FilterMap.FILTER_KA_1 + ratio * (FilterMap.FILTER_KA_2 - FilterMap.FILTER_KA_1), FilterMap.FILTER_D_1 + ratio * (FilterMap.FILTER_D_2 - FilterMap.FILTER_D_1)};
+        if (targetRpm <= FILTER_RPM_1) return new double[]{FILTER_KA_1, FILTER_D_1};
+        if (targetRpm >= FILTER_RPM_3) return new double[]{FILTER_KA_3, FILTER_D_3};
+        if (targetRpm < FILTER_RPM_2) {
+            double ratio = (targetRpm - FILTER_RPM_1) / (FILTER_RPM_2 - FILTER_RPM_1);
+            return new double[]{FILTER_KA_1 + ratio * (FILTER_KA_2 - FILTER_KA_1), FILTER_D_1 + ratio * (FILTER_D_2 - FILTER_D_1)};
         } else {
-            double ratio = (targetRpm - FilterMap.FILTER_RPM_2) / (FilterMap.FILTER_RPM_3 - FilterMap.FILTER_RPM_2);
-            return new double[]{FilterMap.FILTER_KA_2 + ratio * (FilterMap.FILTER_KA_3 - FilterMap.FILTER_KA_2), FilterMap.FILTER_D_2 + ratio * (FilterMap.FILTER_D_3 - FilterMap.FILTER_D_2)};
+            double ratio = (targetRpm - FILTER_RPM_2) / (FILTER_RPM_3 - FILTER_RPM_2);
+            return new double[]{FILTER_KA_2 + ratio * (FILTER_KA_3 - FILTER_KA_2), FILTER_D_2 + ratio * (FILTER_D_3 - FILTER_D_2)};
         }
     }
 
@@ -308,17 +284,17 @@ public class AutoAimSubsystem {
 
         double chassisDistToTarget = Math.hypot(targetX - rX, targetY - rY);
         isLLActiveThisLoop = false;
-        if (ll != null && speed < LLConfig.LL_MAX_TRUST_SPEED) {
+        if (ll != null && speed < LL_MAX_TRUST_SPEED) {
             LLResult result = ll.getLatestResult();
-            if (result != null && result.isValid() && chassisDistToTarget < LLConfig.LL_MAX_TRUST_DISTANCE && result.getStaleness() < LLConfig.LL_MAX_STALENESS_MS) {
+            if (result != null && result.isValid() && chassisDistToTarget < LL_MAX_TRUST_DISTANCE && result.getStaleness() < LL_MAX_STALENESS_MS) {
                 Pose3D botpose = result.getBotpose();
                 double llRawX_Meters = botpose.getPosition().x;
                 double llRawY_Meters = botpose.getPosition().y;
                 if (llRawX_Meters != lastProcessedBotposeX || llRawY_Meters != lastProcessedBotposeY) {
                     lastProcessedBotposeX = llRawX_Meters; lastProcessedBotposeY = llRawY_Meters;
                     double llRawYaw_Rad = botpose.getOrientation().getYaw(AngleUnit.RADIANS);
-                    double targetWorldX_Inches = (llRawY_Meters * 39.3701) + Offsets.FIELD_OFFSET_X;
-                    double targetWorldY_Inches = (-llRawX_Meters * 39.3701) + Offsets.FIELD_OFFSET_Y;
+                    double targetWorldX_Inches = (llRawY_Meters * 39.3701) + FIELD_OFFSET_X;
+                    double targetWorldY_Inches = (-llRawX_Meters * 39.3701) + FIELD_OFFSET_Y;
                     double targetWorldH_Rad = AngleUnit.normalizeRadians(llRawYaw_Rad + Math.PI);
                     long totalLatencyNano = (long) ((result.getCaptureLatency() + result.getTargetingLatency()) * 1_000_000.0);
                     OdoRecord histRawOdo = getHistoricalPose(currentNanoTime - totalLatencyNano);
@@ -329,10 +305,10 @@ public class AutoAimSubsystem {
                     double errY = targetWorldY_Inches - histRealY;
                     double errH = AngleUnit.normalizeRadians(targetWorldH_Rad - histRealH);
                     int tagCount = result.getFiducialResults().size();
-                    double dynamicWeightPos = (tagCount >= 2) ? LLConfig.LL_MULTI_TAG_POS_WEIGHT : LLConfig.LL_SINGLE_TAG_BASE_POS_WEIGHT * Math.max(0.0, 1.0 - Math.pow(botpose.getPosition().z/LLConfig.LL_MAX_SINGLE_TAG_DIST_M, 2));
-                    double dynamicWeightHeading = (tagCount >= 2) ? LLConfig.LL_MULTI_TAG_HEADING_WEIGHT : LLConfig.LL_SINGLE_TAG_BASE_HEADING_WEIGHT * Math.max(0.0, 1.0 - Math.pow(botpose.getPosition().z/LLConfig.LL_MAX_SINGLE_TAG_DIST_M, 2));
+                    double dynamicWeightPos = (tagCount >= 2) ? LL_MULTI_TAG_POS_WEIGHT : LL_SINGLE_TAG_BASE_POS_WEIGHT * Math.max(0.0, 1.0 - Math.pow(botpose.getPosition().z/LL_MAX_SINGLE_TAG_DIST_M, 2));
+                    double dynamicWeightHeading = (tagCount >= 2) ? LL_MULTI_TAG_HEADING_WEIGHT : LL_SINGLE_TAG_BASE_HEADING_WEIGHT * Math.max(0.0, 1.0 - Math.pow(botpose.getPosition().z/LL_MAX_SINGLE_TAG_DIST_M, 2));
                     double jumpDist = Math.hypot(errX, errY);
-                    if (jumpDist < LLConfig.LL_MAX_TELEPORT_INCHES) {
+                    if (jumpDist < LL_MAX_TELEPORT_INCHES) {
                         visionOffsetX += errX * dynamicWeightPos;
                         visionOffsetY += errY * dynamicWeightPos;
                         visionOffsetH_Rad = AngleUnit.normalizeRadians(visionOffsetH_Rad + errH * dynamicWeightHeading);
@@ -345,24 +321,24 @@ public class AutoAimSubsystem {
 
         double cosH = Math.cos(rH_Rad);
         double sinH = Math.sin(rH_Rad);
-        double turretX = rX + (Offsets.TURRET_OFFSET_FWD * (-sinH)) + (Offsets.TURRET_OFFSET_LEFT * (-cosH));
-        double turretY = rY + (Offsets.TURRET_OFFSET_FWD * ( cosH)) + (Offsets.TURRET_OFFSET_LEFT * (-sinH));
+        double turretX = rX + (TURRET_OFFSET_FWD * (-sinH)) + (TURRET_OFFSET_LEFT * (-cosH));
+        double turretY = rY + (TURRET_OFFSET_FWD * ( cosH)) + (TURRET_OFFSET_LEFT * (-sinH));
         double dtNano = (currentNanoTime - lastLoopTime);
         double dtSec = Math.max(dtNano / 1.0E9, 0.001);
 
-        double tanVx = (Offsets.TURRET_OFFSET_FWD * -cosH * rOmegaRad) + (Offsets.TURRET_OFFSET_LEFT * sinH * rOmegaRad);
-        double tanVy = (Offsets.TURRET_OFFSET_FWD * -sinH * rOmegaRad) + (Offsets.TURRET_OFFSET_LEFT * -cosH * rOmegaRad);
+        double tanVx = (TURRET_OFFSET_FWD * -cosH * rOmegaRad) + (TURRET_OFFSET_LEFT * sinH * rOmegaRad);
+        double tanVy = (TURRET_OFFSET_FWD * -sinH * rOmegaRad) + (TURRET_OFFSET_LEFT * -cosH * rOmegaRad);
         double turretVx = rVx + tanVx;
         double turretVy = rVy + tanVy;
 
         if (lastLoopTime == 0) { lastRawVxField = turretVx; lastRawVyField = turretVy; lastSmoothVxField = turretVx; lastSmoothVyField = turretVy; lastROmegaDeg = rOmegaDeg; }
         double currentAx = (turretVx - lastRawVxField) / dtSec;
         double currentAy = (turretVy - lastRawVyField) / dtSec;
-        if (Math.hypot(currentAx, currentAy) > HWLimit.MAX_PHYSICAL_ACCEL) { isImpactDetected = true; impactTimer.reset(); }
-        else if (impactTimer.milliseconds() > HWLimit.IMPACT_COOLDOWN_MS) isImpactDetected = false;
+        if (Math.hypot(currentAx, currentAy) > MAX_PHYSICAL_ACCEL) { isImpactDetected = true; impactTimer.reset(); }
+        else if (impactTimer.milliseconds() > IMPACT_COOLDOWN_MS) isImpactDetected = false;
 
         lastRawVxField = turretVx; lastRawVyField = turretVy;
-        double alpha = isImpactDetected ? HWLimit.ALPHA_IMPACT : HWLimit.ALPHA_NORMAL;
+        double alpha = isImpactDetected ? ALPHA_IMPACT : ALPHA_NORMAL;
         double smoothVx = lastSmoothVxField * (1.0 - alpha) + turretVx * alpha;
         double smoothVy = lastSmoothVyField * (1.0 - alpha) + turretVy * alpha;
         lastSmoothAxField = lastSmoothAxField * (1.0 - alpha) + currentAx * alpha;
@@ -372,8 +348,8 @@ public class AutoAimSubsystem {
 
         AimCalculator.AimResult aim = null;
         double feedforwardPower = 0.0;
-        double encoderDeg = turretMotor != null ? (turretMotor.getCurrentPosition() / HWLimit.TICKS_PER_DEGREE) : 0;
-        double currentAngleRelToChassis = encoderDeg + Offsets.TURRET_START_OFFSET_DEG;
+        double encoderDeg = turretMotor != null ? (turretMotor.getCurrentPosition() / TICKS_PER_DEGREE) : 0;
+        double currentAngleRelToChassis = encoderDeg + TURRET_START_OFFSET_DEG;
 
         double currentTurretVelDeg = (encoderDeg - lastEncoderDegForDeriv) / dtSec;
         lastEncoderDegForDeriv = encoderDeg;
@@ -413,7 +389,7 @@ public class AutoAimSubsystem {
                 power = 0;
                 currentStageName = "【手动到达锁定】(BRAKE)";
             } else {
-                if (absError <= ManualPID.MANUAL_ERROR_TOLERANCE) {
+                if (absError <= MANUAL_ERROR_TOLERANCE) {
                     isManualBrakeLocked = true;
                     power = 0;
                     manualIntegralSum = 0;
@@ -421,14 +397,14 @@ public class AutoAimSubsystem {
                 } else {
                     currentStageName = "【手动平滑控制】";
 
-                    double ratio = Math.min(1.0, absError / ManualPID.MANUAL_STAGE_THRESHOLD);
-                    double currentP = ManualPID.kP_near_manual + ratio * (ManualPID.kP_far_manual - ManualPID.kP_near_manual);
-                    double currentI = ManualPID.kI_near_manual + ratio * (ManualPID.kI_far_manual - ManualPID.kI_near_manual);
-                    double currentD = ManualPID.kD_near_manual + ratio * (ManualPID.kD_far_manual - ManualPID.kD_near_manual);
+                    double ratio = Math.min(1.0, absError / MANUAL_STAGE_THRESHOLD);
+                    double currentP = kP_near_manual + ratio * (kP_far_manual - kP_near_manual);
+                    double currentI = kI_near_manual + ratio * (kI_far_manual - kI_near_manual);
+                    double currentD = kD_near_manual + ratio * (kD_far_manual - kD_near_manual);
 
-                    if (absError < ManualPID.I_ZONE_near_manual) {
+                    if (absError < I_ZONE_near_manual) {
                         manualIntegralSum += error * dtSec;
-                        double maxISum = ManualPID.MANUAL_MAX_INTEGRAL_POWER / (currentI == 0 ? 1 : currentI);
+                        double maxISum = MANUAL_MAX_INTEGRAL_POWER / (currentI == 0 ? 1 : currentI);
                         manualIntegralSum = Math.max(-maxISum, Math.min(maxISum, manualIntegralSum));
                     } else {
                         manualIntegralSum = 0;
@@ -436,7 +412,7 @@ public class AutoAimSubsystem {
 
                     double derivativeTerm = -currentD * currentTurretVelDeg;
                     double pidPower = (currentP * error) + (currentI * manualIntegralSum) + derivativeTerm;
-                    double feedforward = (absError < ManualPID.MANUAL_STAGE_THRESHOLD) ? (Math.signum(error) * ManualPID.kS_near_manual) : 0;
+                    double feedforward = (absError < MANUAL_STAGE_THRESHOLD) ? (Math.signum(error) * kS_near_manual) : 0;
                     power = pidPower + feedforward;
                 }
             }
@@ -452,7 +428,7 @@ public class AutoAimSubsystem {
             aim = AimCalculator.solveAim(turretX, turretY, smoothVx, smoothVy, lastSmoothAxField, lastSmoothAyField, targetX, targetY);
             double distanceToTarget = Math.hypot(targetX - turretX, targetY - turretY);
 
-            dynamicToleranceDeg = Math.max(0.5, Math.min(AimConfig.MAX_AIM_ANGLE_TOLERANCE, Math.toDegrees(Math.atan2(AimConfig.TARGET_HITBOX_WIDTH_INCHES / 2.0, distanceToTarget))));
+            dynamicToleranceDeg = Math.max(0.5, Math.min(MAX_AIM_ANGLE_TOLERANCE, Math.toDegrees(Math.atan2(TARGET_HITBOX_WIDTH_INCHES / 2.0, distanceToTarget))));
 
             double activeTargetRpm = (aim != null) ? aim.rpm : 2800.0;
             double[] filters = getDynamicFilters(activeTargetRpm);
@@ -475,9 +451,9 @@ public class AutoAimSubsystem {
                 double shortestPathError = AngleUnit.normalizeDegrees(desiredRelDegToChassis - currentAngleRelToChassis);
                 double rawTargetEncoderDeg = encoderDeg + shortestPathError;
 
-                if (rawTargetEncoderDeg > HWLimit.TURRET_SOFT_LIMIT_CCW) rawTargetEncoderDeg -= 360.0;
-                else if (rawTargetEncoderDeg < HWLimit.TURRET_SOFT_LIMIT_CW) rawTargetEncoderDeg += 360.0;
-                rawTargetEncoderDeg = Math.max(HWLimit.TURRET_SOFT_LIMIT_CW, Math.min(HWLimit.TURRET_SOFT_LIMIT_CCW, rawTargetEncoderDeg));
+                if (rawTargetEncoderDeg > TURRET_SOFT_LIMIT_CCW) rawTargetEncoderDeg -= 360.0;
+                else if (rawTargetEncoderDeg < TURRET_SOFT_LIMIT_CW) rawTargetEncoderDeg += 360.0;
+                rawTargetEncoderDeg = Math.max(TURRET_SOFT_LIMIT_CW, Math.min(TURRET_SOFT_LIMIT_CCW, rawTargetEncoderDeg));
 
                 command.pidErrorDeg = rawTargetEncoderDeg - encoderDeg;
 
@@ -488,7 +464,7 @@ public class AutoAimSubsystem {
                 if (command.isUnwinding || Double.isNaN(profiledTargetDeg)) {
                     profiledTargetDeg = rawTargetEncoderDeg;
                 } else {
-                    double maxStep = AimConfig.TARGET_SLEW_RATE_DEG_PER_SEC * dtSec;
+                    double maxStep = TARGET_SLEW_RATE_DEG_PER_SEC * dtSec;
                     if (Math.abs(rawTargetEncoderDeg - profiledTargetDeg) <= maxStep) {
                         profiledTargetDeg = rawTargetEncoderDeg;
                     } else {
@@ -501,18 +477,18 @@ public class AutoAimSubsystem {
                 double dx = targetX - turretX, dy = targetY - turretY, distSq = dx * dx + dy * dy;
                 double tangentialVelocity = (turretVx * dy - turretVy * dx) / Math.sqrt(distSq);
                 double reqOmegaTrans = Math.toDegrees(tangentialVelocity / Math.sqrt(distSq));
-                feedforwardPower = ((-rOmegaDeg + reqOmegaTrans) * AimConfig.kV_TURRET) + (-currentAlphaDeg * (isShootingMode ? AimConfig.kA_TURRET : 0.0));
+                feedforwardPower = ((-rOmegaDeg + reqOmegaTrans) * kV_TURRET) + (-currentAlphaDeg * (isShootingMode ? kA_TURRET : 0.0));
 
-                double effectiveError = Math.abs(activePidError) < AimConfig.PID_DEADBAND_DEG ? 0 : activePidError;
+                double effectiveError = Math.abs(activePidError) < PID_DEADBAND_DEG ? 0 : activePidError;
                 double effectiveAbsError = Math.abs(effectiveError);
 
-                double aSTAGE = command.isUnwinding ? UnwindPID.STAGE_THRESHOLD_UNWIND : AutoPID.STAGE_THRESHOLD;
-                double aP_f = command.isUnwinding ? UnwindPID.kP_far_unwind : AutoPID.kP_far, aI_f = command.isUnwinding ? UnwindPID.kI_far_unwind : AutoPID.kI_far, aD_f = command.isUnwinding ? UnwindPID.kD_far_unwind : AutoPID.kD_far;
-                double aP_n = command.isUnwinding ? UnwindPID.kP_near_unwind : AutoPID.kP_near, aI_n = command.isUnwinding ? UnwindPID.kI_near_unwind : AutoPID.kI_near, aD_n = command.isUnwinding ? UnwindPID.kD_near_unwind : AutoPID.kD_near;
-                double aS_n = command.isUnwinding ? UnwindPID.kS_near_unwind : AutoPID.kS_near, aI_zone = command.isUnwinding ? UnwindPID.I_ZONE_near_unwind : AutoPID.I_ZONE_near;
+                double aSTAGE = command.isUnwinding ? STAGE_THRESHOLD_UNWIND : STAGE_THRESHOLD;
+                double aP_f = command.isUnwinding ? kP_far_unwind : kP_far, aI_f = command.isUnwinding ? kI_far_unwind : kI_far, aD_f = command.isUnwinding ? kD_far_unwind : kD_far;
+                double aP_n = command.isUnwinding ? kP_near_unwind : kP_near, aI_n = command.isUnwinding ? kI_near_unwind : kI_near, aD_n = command.isUnwinding ? kD_near_unwind : kD_near;
+                double aS_n = command.isUnwinding ? kS_near_unwind : kS_near, aI_zone = command.isUnwinding ? I_ZONE_near_unwind : I_ZONE_near;
 
                 double pidPower = 0;
-                if (Math.abs(command.pidErrorDeg) <= AutoPID.ERROR_TOLERANCE) {
+                if (Math.abs(command.pidErrorDeg) <= ERROR_TOLERANCE) {
                     pidPower = 0; integralSum = 0; currentStageName = "【到达目标】";
                 } else {
                     currentStageName = command.isUnwinding ? "【复位平滑追踪】" : "【自动平滑追踪】";
@@ -524,7 +500,7 @@ public class AutoAimSubsystem {
 
                     if (effectiveAbsError > 0 && effectiveAbsError < aI_zone) {
                         integralSum += effectiveError * dtSec;
-                        double maxISum = AutoPID.MAX_INTEGRAL_POWER / (currentI == 0 ? 1 : currentI);
+                        double maxISum = MAX_INTEGRAL_POWER / (currentI == 0 ? 1 : currentI);
                         integralSum = Math.max(-maxISum, Math.min(maxISum, integralSum));
                     } else {
                         integralSum = 0;

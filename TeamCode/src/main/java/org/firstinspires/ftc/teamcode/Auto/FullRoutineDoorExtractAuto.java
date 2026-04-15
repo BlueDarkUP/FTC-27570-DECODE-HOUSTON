@@ -36,7 +36,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
     private Timer opmodeTimer;
     private int pathState;
 
-    private final int MAX_DOOR_EXTRACT_LOOPS = 3;
+    private final int MAX_DOOR_EXTRACT_LOOPS = 2;
     private int doorExtractLoopCount = 0;
 
     private final double STAGE_THRESHOLD = 14.0;
@@ -145,21 +145,21 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                         new BezierCurve(
                                 new Pose(60.000, 83.000),
                                 new Pose(45.000, 60.000),
-                                new Pose(12.5, 59)
+                                new Pose(12.3, 59.8)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(226), Math.toRadians(163))
+                .setLinearHeadingInterpolation(Math.toRadians(226), Math.toRadians(150))
                 .build();
 
         fashekaimenzuo = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(12.5, 59),
+                                new Pose(12.3, 59.8),
                                 new Pose(35.000, 47.000),
                                 new Pose(60.000, 83.000)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(163), Math.toRadians(226))
+                .setLinearHeadingInterpolation(Math.toRadians(150), Math.toRadians(226))
                 .build();
 
         zhunbeixidiyipai = follower.pathBuilder()
@@ -208,7 +208,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 .addPath(
                         new BezierLine(
                                 new Pose(45.000, 36.000),
-                                new Pose(11.000, 36.000)
+                                new Pose(12.000, 36.000)
                         )
                 )
                 .setTangentHeadingInterpolation()
@@ -217,7 +217,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
         fashedisanpai = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(11.000, 36.000),
+                                new Pose(12.000, 36.000),
                                 new Pose(47.308, 32.731),
                                 new Pose(60.000, 83.000)
                         )
@@ -421,14 +421,14 @@ public class FullRoutineDoorExtractAuto extends OpMode {
             case 10:
                 follower.setMaxPower(0.7);
                 follower.followPath(diyigepaoda, false);
-                turretTargetAngle = -50.0;
+                turretTargetAngle = -48.0;
                 flywheelTargetRPM = 4000.0;
                 intakeMotor.setPower(0.0);
                 setPathState(11);
                 break;
             case 11:
-                if (pathTimer.getElapsedTimeSeconds() >= 1.6) {
-                    startBlindShoot(1);
+                if (pathTimer.getElapsedTimeSeconds() >= 1.2) {
+                    startBlindShoot(0.5);
                     setPathState(12);
                 }
                 break;
@@ -453,7 +453,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 follower.followPath(xidierpai, false);
                 bbb.setPosition(0.0);
                 intakeMotor.setPower(1.0);
-                flywheelTargetRPM = 3400;
+                flywheelTargetRPM = 3250;
                 setPathState(21);
                 break;
             case 21:
@@ -462,8 +462,8 @@ public class FullRoutineDoorExtractAuto extends OpMode {
 
             case 30:
                 follower.followPath(fashedierpai, true);
-                turretTargetAngle = -93.0;
-                flywheelTargetRPM = 3400.0;
+                turretTargetAngle = -93;
+                flywheelTargetRPM = 3250.0;
                 intakeMotor.setPower(0.0);
                 setPathState(31);
                 break;
@@ -473,8 +473,8 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 }
                 break;
             case 315:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.5) {
-                    startPrecisionShoot(1);
+                if (pathTimer.getElapsedTimeSeconds() >= 0.4) {
+                    startPrecisionShoot(0.6);
                     setPathState(32);
                 }
                 break;
@@ -488,7 +488,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
             case 40:
                 follower.followPath(kaimenzuo, true);
                 intakeMotor.setPower(1.0);
-                flywheelTargetRPM = 3400.0;
+                flywheelTargetRPM = 3250.0;
                 setPathState(41);
                 break;
             case 41:
@@ -504,8 +504,8 @@ public class FullRoutineDoorExtractAuto extends OpMode {
 
             case 50:
                 follower.followPath(fashekaimenzuo, true);
-                turretTargetAngle = -93.0;
-                flywheelTargetRPM = 3400.0;
+                turretTargetAngle = -93;
+                flywheelTargetRPM = 3250.0;
                 intakeMotor.setPower(1.0);
                 setPathState(51);
                 break;
@@ -515,8 +515,8 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 }
                 break;
             case 515:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.5) {
-                    startPrecisionShoot(1.0);
+                if (pathTimer.getElapsedTimeSeconds() >= 0.4) {
+                    startPrecisionShoot(0.6);
                     setPathState(52);
                 }
                 break;
@@ -534,7 +534,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
 
             case 60:
                 follower.followPath(zhunbeixidiyipai, false);
-                flywheelTargetRPM = 3400.0;
+                flywheelTargetRPM = 3250.0;
                 intakeMotor.setPower(1.0);
                 setPathState(61);
                 break;
@@ -555,8 +555,8 @@ public class FullRoutineDoorExtractAuto extends OpMode {
 
             case 80:
                 follower.followPath(fashediyipai, true);
-                turretTargetAngle = -93.0;
-                flywheelTargetRPM = 3400.0;
+                turretTargetAngle = -93;
+                flywheelTargetRPM = 3250.0;
                 intakeMotor.setPower(0.0);
                 setPathState(81);
                 break;
@@ -566,8 +566,8 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 }
                 break;
             case 815:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.5) {
-                    startPrecisionShoot(1.0);
+                if (pathTimer.getElapsedTimeSeconds() >= 0.4) {
+                    startPrecisionShoot(0.6);
                     setPathState(82);
                 }
                 break;
@@ -577,7 +577,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
 
             case 90:
                 follower.followPath(zhunbeixidisanpai, false);
-                flywheelTargetRPM = 3400.0;
+                flywheelTargetRPM = 3250.0;
                 intakeMotor.setPower(1.0);
                 setPathState(91);
                 break;
@@ -598,8 +598,8 @@ public class FullRoutineDoorExtractAuto extends OpMode {
 
             case 110:
                 follower.followPath(fashedisanpai, true);
-                turretTargetAngle = -118.0;
-                flywheelTargetRPM = 3400.0;
+                turretTargetAngle = -113.0;
+                flywheelTargetRPM = 3250.0;
                 intakeMotor.setPower(0.0);
                 setPathState(111);
                 break;
@@ -609,8 +609,8 @@ public class FullRoutineDoorExtractAuto extends OpMode {
                 }
                 break;
             case 1115:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.5) {
-                    startPrecisionShoot(1.0);
+                if (pathTimer.getElapsedTimeSeconds() >= 0.4) {
+                    startPrecisionShoot(0.6);
                     setPathState(112);
                 }
                 break;
@@ -698,7 +698,7 @@ public class FullRoutineDoorExtractAuto extends OpMode {
 
     @Override
     public void loop() {
-        setPitchServos(0.8);
+        setPitchServos(0.87);
 
         follower.update();
         autonomousPathUpdate();
