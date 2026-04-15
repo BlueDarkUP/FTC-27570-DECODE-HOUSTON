@@ -34,7 +34,7 @@ public class close21 extends OpMode {
     private Timer opmodeTimer;
     private int pathState;
 
-    private final int MAX_DOOR_EXTRACT_LOOPS = 4;
+    private final int MAX_DOOR_EXTRACT_LOOPS = 3;
     private int doorExtractLoopCount = 0;
 
     private final double STAGE_THRESHOLD = 14.0;
@@ -87,7 +87,7 @@ public class close21 extends OpMode {
     private double activeShootDuration = 0.0;
 
     private final double LP_UP = 1;
-    private final double LP_DOWN = 0.4;
+    private final double LP_DOWN = 0.2;
     private final double RP_UP = 0;
     private final double RP_DOWN = 0.5;
 
@@ -98,9 +98,6 @@ public class close21 extends OpMode {
     public PathChain fashekaimenzuo;
     public PathChain zhunbeixidiyipai;
     public PathChain xidiyipai;
-    public PathChain fashediyipai;
-    public PathChain zhunbeixidisanpai;
-    public PathChain xidisanpai;
     public PathChain Returntofixedlaunchpoint;
 
     private final Pose startPose = new Pose(35.000, 134.600, Math.toRadians(180));
@@ -142,7 +139,7 @@ public class close21 extends OpMode {
                         new BezierCurve(
                                 new Pose(60.000, 83.000),
                                 new Pose(45.000, 60.000),
-                                new Pose(12.3, 58)
+                                new Pose(12.3, 58.5)
                         )
                 )
                 .setLinearHeadingInterpolation(Math.toRadians(226), Math.toRadians(150))
@@ -151,7 +148,7 @@ public class close21 extends OpMode {
         fashekaimenzuo = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(12.3, 58),
+                                new Pose(12.3, 58.5),
                                 new Pose(35.000, 47.000),
                                 new Pose(60.000, 83.000)
                         )
@@ -180,41 +177,10 @@ public class close21 extends OpMode {
                 .setTangentHeadingInterpolation()
                 .build();
 
-        fashediyipai = follower.pathBuilder()
-                .addPath(
-                        new BezierLine(
-                                new Pose(19.000, 83.000),
-                                new Pose(60.000, 83.000)
-                        )
-                )
-                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(230))
-                .build();
-
-        zhunbeixidisanpai = follower.pathBuilder()
-                .addPath(
-                        new BezierLine(
-                                new Pose(60.000, 83.000),
-                                new Pose(50.000, 36.000)
-                        )
-                )
-                .setLinearHeadingInterpolation(Math.toRadians(230), Math.toRadians(180))
-                .setNoDeceleration()
-                .build();
-
-        xidisanpai = follower.pathBuilder()
-                .addPath(
-                        new BezierLine(
-                                new Pose(50.000, 36.000),
-                                new Pose(12.000, 36.000)
-                        )
-                )
-                .setTangentHeadingInterpolation()
-                .build();
-
         Returntofixedlaunchpoint = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(13.000, 35.800),
+                                new Pose(19.000, 83.000), // xidiyipai 的结束坐标
                                 new Pose(59.923, 107.923)
                         )
                 )
@@ -459,8 +425,8 @@ public class close21 extends OpMode {
                 }
                 break;
             case 315:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.4) {
-                    startPrecisionShoot(0.6);
+                if (pathTimer.getElapsedTimeSeconds() >= 0.3) {
+                    startPrecisionShoot(0.4);
                     setPathState(32);
                 }
                 break;
@@ -501,8 +467,8 @@ public class close21 extends OpMode {
                 }
                 break;
             case 515:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.4) {
-                    startPrecisionShoot(0.6);
+                if (pathTimer.getElapsedTimeSeconds() >= 0.3) {
+                    startPrecisionShoot(0.4);
                     setPathState(52);
                 }
                 break;
@@ -536,13 +502,13 @@ public class close21 extends OpMode {
                 setPathState(71);
                 break;
             case 71:
-                if (!follower.isBusy()) { setPathState(80); }
+                if (!follower.isBusy()) { setPathState(80); } // 此时吸完第一排，直接前往终点发射
                 break;
 
-            case 80:
-                follower.followPath(fashediyipai, true);
-                turretTargetAngle = -93;
-                flywheelTargetRPM = 3250.0;
+            case 80: // 前往原本第三排的发射终点
+                follower.followPath(Returntofixedlaunchpoint, true);
+                turretTargetAngle = -27.0; // 维持了第三排发射时相同的云台角度
+                flywheelTargetRPM = 3250.0; // 维持了相同的RPM
                 intakeMotor.setPower(0.0);
                 setPathState(81);
                 break;
@@ -552,66 +518,23 @@ public class close21 extends OpMode {
                 }
                 break;
             case 815:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.4) {
-                    startPrecisionShoot(0.6);
+                if (pathTimer.getElapsedTimeSeconds() >= 0.3) {
+                    startPrecisionShoot(0.4);
                     setPathState(82);
                 }
                 break;
             case 82:
-                if (!isShootingActive()) { setPathState(90); }
+                if (!isShootingActive()) { setPathState(90); } // 发射完成，进入结束状态
                 break;
 
             case 90:
-                follower.followPath(zhunbeixidisanpai, false);
-                flywheelTargetRPM = 3250.0;
-                intakeMotor.setPower(1.0);
-                setPathState(91);
-                break;
-            case 91:
-                if (!follower.isBusy() || follower.atParametricEnd()) {
-                    setPathState(100);
-                }
-                break;
-
-            case 100:
-                follower.followPath(xidisanpai, false);
-                intakeMotor.setPower(1.0);
-                setPathState(101);
-                break;
-            case 101:
-                if (!follower.isBusy()) { setPathState(110); }
-                break;
-
-            case 110:
-                follower.followPath(Returntofixedlaunchpoint, true);
-                turretTargetAngle = -27.0;
-                flywheelTargetRPM = 3250.0;
-                intakeMotor.setPower(0.0);
-                setPathState(111);
-                break;
-            case 111:
-                if (!follower.isBusy()) {
-                    setPathState(1115);
-                }
-                break;
-            case 1115:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.4) {
-                    startPrecisionShoot(0.6);
-                    setPathState(112);
-                }
-                break;
-            case 112:
-                if (!isShootingActive()) { setPathState(120); }
-                break;
-
-            case 120:
                 turretTargetAngle = 0.0;
                 flywheelTargetRPM = 0.0;
                 intakeMotor.setPower(0.0);
                 bbb.setPosition(0.0);
-                setPathState(121);
+                setPathState(91);
                 break;
-            case 121:
+            case 91:
                 setPathState(-1);
                 break;
         }

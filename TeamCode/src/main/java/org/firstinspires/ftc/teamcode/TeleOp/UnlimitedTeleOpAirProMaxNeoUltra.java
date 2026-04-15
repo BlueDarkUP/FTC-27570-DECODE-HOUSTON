@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.TeleOp;
 
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -14,18 +15,24 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
-import org.firstinspires.ftc.teamcode.AutoAim.AutoAimSubsystem;
+
+import org.firstinspires.ftc.teamcode.AutoAim.ManualAimSubsystem;
 
 @TeleOp(name = "Unlimited TeleOp AirProMaxNeoSuperUltra", group = "Competition")
 public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
+    // 硬件声明
     private DcMotor lf = null, rf = null, lb = null, rb = null;
     private DcMotorEx motorSH, motorHS, motorIntake;
-    private Servo bbb, LP, RP;
-    private AutoAimSubsystem autoAim;
+    private Servo bbb;
+    private GoBildaPinpointDriver odo; // 替代原来的 IMU
 
-    private final double TARGET_X_WORLD = 136.0;
-    private final double TARGET_Y_WORLD = 135.0;
+    // 引入自瞄子系统
+    private ManualAimSubsystem autoAimSubsystem;
+
+    // 坐标与飞轮常量
+    private final double TARGET_X_WORLD = 135.0;
+    private final double TARGET_Y_WORLD = 136.0;
     private final double IDLE_VELOCITY = 3000.0;
     private final double TRIGGER_DEADZONE = 0.3;
 
@@ -42,9 +49,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
     private final double STALL_COOLDOWN_SEC = 0.5;
     private final double STALL_TIME_THRESHOLD_SEC = 0.3;
 
-    private final double LP_UP = 1, LP_DOWN = 0.4;
-    private final double RP_UP = 0, RP_DOWN = 0.5;
-
+    // 状态机变量
     private boolean isShootingMode = false;
     private boolean lastCircleState = false;
     private boolean isFlywheelReady = false;
@@ -65,10 +70,14 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
     private double lastErrorTPS = 0;
     private double integralSum = 0;
 
+    // 按键重置用变量
+    private double headingOffset = 0.0;
+
     @Override
     public void runOpMode() {
         telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
 
+        // 1. 初始化底盘
         lf = hardwareMap.get(DcMotor.class, "lf");
         rf = hardwareMap.get(DcMotor.class, "rf");
         lb = hardwareMap.get(DcMotor.class, "lb");
@@ -80,10 +89,10 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
         lf.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); rf.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         lb.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); rb.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
+        // 2. 初始化发射系统
         motorSH = hardwareMap.get(DcMotorEx.class, "SH"); motorHS = hardwareMap.get(DcMotorEx.class, "HS");
         motorIntake = hardwareMap.get(DcMotorEx.class, "Intake");
-
-        bbb = hardwareMap.get(Servo.class, "bbb"); LP = hardwareMap.get(Servo.class, "LP"); RP = hardwareMap.get(Servo.class, "RP");
+        bbb = hardwareMap.get(Servo.class, "bbb");
 
         motorSH.setDirection(DcMotorSimple.Direction.FORWARD); motorHS.setDirection(DcMotorSimple.Direction.REVERSE);
         motorIntake.setDirection(DcMotorSimple.Direction.FORWARD);
@@ -96,41 +105,71 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
         bbb.setPosition(0);
 
-        telemetry.addLine("Initializing Hardware, Please wait...");
+        // 3. 初始化 Pinpoint (代替原有的 IMU 和 Odo)
+        odo = hardwareMap.get(GoBildaPinpointDriver.class, "odo");
+        odo.setOffsets(101.16, -160, DistanceUnit.MM);
+        odo.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
+        odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD, GoBildaPinpointDriver.EncoderDirection.REVERSED);
+        odo.resetPosAndIMU();
+        sleep(300);
+        odo.setPosition(new Pose2D(DistanceUnit.INCH, 72.0, 72.0, AngleUnit.DEGREES, 0.0));
+        odo.update();
+
+        // 4. 初始化云台自瞄子系统 (封装版)
+        autoAimSubsystem = new ManualAimSubsystem(hardwareMap);
+
+        telemetry.addLine("Ready to Start - Odometry & Turret are Active!");
         telemetry.update();
 
-        autoAim = new AutoAimSubsystem(hardwareMap, telemetry);
-        sleep(500);
-
-        Pose2D startPose = new Pose2D(DistanceUnit.INCH, 72.0, 72.0, AngleUnit.DEGREES, 0.0);
-        autoAim.setInitialPose(startPose);
-
-        while (opModeInInit()) {
-            AutoAimSubsystem.TurretCommand aimCommand = autoAim.update(TARGET_X_WORLD, TARGET_Y_WORLD, false, false, 25.0, false);
-            if (aimCommand.hasTarget) setPitchServos(aimCommand.targetPitch);
-            telemetry.addLine("Ready to Start - Odometry & Turret are Active!");
-            telemetry.update();
-        }
-
+        waitForStart();
         timer.reset();
 
         while (opModeIsActive()) {
+            // ============== 1. 获取定位数据与物理运算 ==============
+            odo.update();
+            Pose2D pos = odo.getPosition();
 
+            double rx_odo = pos.getX(DistanceUnit.INCH);
+            double ry_odo = pos.getY(DistanceUnit.INCH);
+            // Pinpoint自身返回的角度
+            double rawHeadingDeg = pos.getHeading(AngleUnit.DEGREES);
+
+            // 组合按键重置Yaw功能的真实Heading
+            double currentHeadingDeg = rawHeadingDeg - headingOffset;
+
+            // 速度转换
+            double robotVx = odo.getVelX(DistanceUnit.INCH);
+            double robotVy = odo.getVelY(DistanceUnit.INCH);
+            double headingRadForVel = Math.toRadians(currentHeadingDeg);
+
+            double globalVx = robotVx * Math.cos(headingRadForVel) - robotVy * Math.sin(headingRadForVel);
+            double globalVy = robotVx * Math.sin(headingRadForVel) + robotVy * Math.cos(headingRadForVel);
+
+            // ============== 2. 底盘控制 (使用精确的Pinpoint作为无头模式) ==============
             double y = -gamepad1.left_stick_y;
             double x = gamepad1.left_stick_x * 1.1;
-            double rx = gamepad1.right_stick_x;
-            double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1.0);
-            lf.setPower((y + x + rx) / denominator);
-            lb.setPower((y - x + rx) / denominator);
-            rf.setPower((y - x - rx) / denominator);
-            rb.setPower((y + x - rx) / denominator);
+            double rx_drive = gamepad1.right_stick_x;
 
+            if (gamepad1.right_stick_button) {
+                headingOffset = rawHeadingDeg; // 虚拟重置航向为0
+            }
+
+            // 无头模式场控转换
+            double currentHeadingRad = Math.toRadians(currentHeadingDeg);
+            double rotX = x * Math.cos(-currentHeadingRad) - y * Math.sin(-currentHeadingRad);
+            double rotY = x * Math.sin(-currentHeadingRad) + y * Math.cos(-currentHeadingRad);
+
+            double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(rx_drive), 1.0);
+            lf.setPower((rotY + rotX + rx_drive) / denominator);
+            lb.setPower((rotY - rotX + rx_drive) / denominator);
+            rf.setPower((rotY - rotX - rx_drive) / denominator);
+            rb.setPower((rotY + rotX - rx_drive) / denominator);
+
+            // ============== 3. 按键逻辑与状态机 ==============
             boolean currentSquareState = gamepad1.x;
             if (currentSquareState && !lastSquareState) {
                 isShootingMode = false;
-                if (isManualMode) {
-                    manualIdleOverride = true;
-                }
+                if (isManualMode) manualIdleOverride = true;
             }
             lastSquareState = currentSquareState;
 
@@ -143,9 +182,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             boolean currentLeftBumperState = gamepad1.left_bumper;
             if (currentLeftBumperState && !lastLeftBumperState) {
                 isManualMode = !isManualMode;
-                if (isManualMode) {
-                    manualIdleOverride = false;
-                }
+                if (isManualMode) manualIdleOverride = false;
             }
             lastLeftBumperState = currentLeftBumperState;
 
@@ -157,25 +194,24 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             }
 
             boolean isEmergencyBrake = gamepad1.right_bumper;
+            boolean isPreSpooling = (!isManualMode && gamepad1.left_trigger > TRIGGER_DEADZONE);
 
-            boolean isPreSpooling = false;
-            if (!isManualMode) {
-                isPreSpooling = gamepad1.left_trigger > TRIGGER_DEADZONE;
-            }
-
-            AutoAimSubsystem.TurretCommand aimCommand = autoAim.update(
-                    TARGET_X_WORLD, TARGET_Y_WORLD, isShootingMode,
-                    isManualMode, manualTargetDistance, isEmergencyBrake
+            // ============== 4. 驱动自瞄子系统 ==============
+            ManualAimSubsystem.TurretCommand aimCommand = autoAimSubsystem.update(
+                    rx_odo, ry_odo, globalVx, globalVy, currentHeadingDeg,
+                    TARGET_X_WORLD, TARGET_Y_WORLD,
+                    isManualMode, manualTargetDistance
             );
 
-            if (aimCommand.hasTarget) {
-                setPitchServos(aimCommand.targetPitch);
-            }
-
+            // ============== 5. 飞轮状态控制 ==============
             double targetVelocityRPM = IDLE_VELOCITY;
             String flywheelActionState = "怠速 (Idle)";
 
-            if (isShootingMode) {
+            if (isEmergencyBrake) {
+                targetVelocityRPM = 0;
+                flywheelActionState = "紧急刹车 (E-Brake)";
+                bbb.setPosition(0);
+            } else if (isShootingMode) {
                 bbb.setPosition(0.18);
                 if (aimCommand.hasTarget) {
                     targetVelocityRPM = aimCommand.targetRpm;
@@ -195,6 +231,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
                 }
             }
 
+            // 飞轮 PID 控制与容差计算
             double dynamicTolerance;
             if (targetVelocityRPM <= RPM_LOWER_BOUND) dynamicTolerance = MAX_TOLERANCE;
             else if (targetVelocityRPM >= RPM_UPPER_BOUND) dynamicTolerance = MIN_TOLERANCE;
@@ -219,6 +256,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             }
             boolean rpmOK = isFlywheelReady;
 
+            // PIDF 运算
             double dt = timer.seconds();
             timer.reset();
             if (dt == 0) dt = 1e-9;
@@ -253,6 +291,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             power = Math.max(0.0, Math.min(1.0, power));
             motorSH.setPower(power); motorHS.setPower(power);
 
+            // ============== 6. 进件器 Intake 控制与安全机制 ==============
             double intakeCurrent = motorIntake.getCurrent(CurrentUnit.AMPS);
 
             if (isShootingMode) {
@@ -260,7 +299,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
                 if (aimCommand.hasTarget && aimCommand.isUnwinding) {
                     if (!wasUnwinding) unwindReverseEndTime = getRuntime() + 0.35;
                     if (getRuntime() < unwindReverseEndTime) {
-                        motorIntake.setPower(-1.0);
+                        motorIntake.setPower(-0.2);
                         telemetry.addData("🔴 发射系统", "⚠️ 云台复位中: Intake 反转退弹!");
                     } else {
                         motorIntake.setPower(0.0);
@@ -297,12 +336,19 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             }
             wasUnwinding = aimCommand.isUnwinding;
 
-            telemetry.addData("操作模式", isManualMode ? "🛠️ [手动控制档] (屏蔽漂移)" : "🤖 [自动自瞄档]");
+            // ============== 7. Telemetry 数据更新 ==============
+            telemetry.addData("操作模式", isManualMode ? "🛠️ [手动控制档] (屏蔽动态预测)" : "🤖 [自动自瞄档]");
             telemetry.addData("当前动作", isShootingMode ? "[ 发射模式 ]" : "[ 怠速/收集模式 ]");
             telemetry.addData("飞轮动作策略", flywheelActionState);
             telemetry.addData("瞬态接管状态", activeBoost);
 
-            if (aimCommand.hasTarget) telemetry.addData("Pitch 舵机", "LP: %.3f | RP: %.3f", LP.getPosition(), RP.getPosition());
+            telemetry.addData("Odo X / Y", "%.1f / %.1f", rx_odo, ry_odo);
+            telemetry.addData("Heading", "%.1f", currentHeadingDeg);
+
+            if (aimCommand.hasTarget) {
+                telemetry.addData("云台锁定", aimCommand.isAimLocked ? "✅ LOCKED" : "⏳ 追踪中");
+                telemetry.addData("计算 Pitch", "%.3f", aimCommand.targetPitch);
+            }
 
             telemetry.addData("飞轮目标 RPM", targetVelocityRPM);
             telemetry.addData("飞轮当前 RPM", currentRPM);
@@ -310,13 +356,8 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
             telemetry.update();
         }
-    }
 
-    private void setPitchServos(double targetPitch) {
-        double clampedLP = Math.max(LP_DOWN, Math.min(LP_UP, targetPitch));
-        double proportion = (clampedLP - LP_DOWN) / (LP_UP - LP_DOWN);
-        double calculatedRP = RP_DOWN + proportion * (RP_UP - RP_DOWN);
-        calculatedRP = Math.max(0.0, Math.min(1.0, calculatedRP));
-        LP.setPosition(clampedLP); RP.setPosition(calculatedRP);
+        // OPMode 结束后停止子系统电机
+        autoAimSubsystem.stop();
     }
 }
