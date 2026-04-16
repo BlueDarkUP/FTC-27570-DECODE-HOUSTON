@@ -24,7 +24,6 @@ public class IntakeSubsystem {
     private double unwindReverseEndTime = 0.0;
     private boolean wasUnwinding = false;
 
-    // 内部计时器，用于替代原来 TeleOp 中的 getRuntime()
     private ElapsedTime runtime = new ElapsedTime();
 
     // 状态反馈给 Telemetry
@@ -71,7 +70,7 @@ public class IntakeSubsystem {
                 }
 
                 if (currentTime < unwindReverseEndTime) {
-                    motorIntake.setPower(-0.2);
+                    motorIntake.setPower(-0.1);
                     systemStatusMessage = "⚠️ 云台复位中: Intake 反转退弹!";
                 } else {
                     motorIntake.setPower(0.0);
