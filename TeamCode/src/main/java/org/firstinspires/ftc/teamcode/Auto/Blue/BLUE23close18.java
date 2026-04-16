@@ -47,13 +47,24 @@ public class BLUE23close18 extends OpMode {
 
     public void buildPaths() {
         diyigepaoda = follower.pathBuilder()
-                .addPath(new BezierLine(new Pose(35.000, 134.600), new Pose(60.000, 59.000)))
-                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                .addPath(
+                        new BezierLine(
+                                new Pose(35.000, 135.000),
+                                new Pose(48.000, 86.000)
+                        )
+                )
+                .setConstantHeadingInterpolation(Math.toRadians(180))
                 .build();
 
         xidierpai = follower.pathBuilder()
-                .addPath(new BezierLine(new Pose(60.000, 59.000), new Pose(11.000, 59.000)))
-                .setTangentHeadingInterpolation()
+                .addPath(
+                        new BezierCurve(
+                                new Pose(48.000, 86.000),
+                                new Pose(60.654, 54.923),
+                                new Pose(13.00, 59)
+                        )
+                )
+                .setConstantHeadingInterpolation(Math.toRadians(180))
                 .build();
 
         fashedierpai = follower.pathBuilder()
@@ -62,13 +73,19 @@ public class BLUE23close18 extends OpMode {
                 .build();
 
         kaimenzuo = follower.pathBuilder()
-                .addPath(new BezierCurve(new Pose(60.000, 83.000), new Pose(45.000, 60.000), new Pose(11.5, 59.5)))
-                .setLinearHeadingInterpolation(Math.toRadians(226), Math.toRadians(150))
+                .addPath(
+                        new BezierCurve(
+                                new Pose(50.000, 80.000),
+                                new Pose(45.000, 61.3000),
+                                new Pose(11.5, 61.5)
+                        )
+                )
+                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(157))
                 .build();
 
         fashekaimenzuo = follower.pathBuilder()
-                .addPath(new BezierCurve(new Pose(11.5, 59.5), new Pose(35.000, 47.000), new Pose(60.000, 83.000)))
-                .setLinearHeadingInterpolation(Math.toRadians(150), Math.toRadians(226))
+                .addPath(new BezierCurve(new Pose(11.5, 61.5), new Pose(35.000, 47.000), new Pose(60.000, 83.000)))
+                .setLinearHeadingInterpolation(Math.toRadians(157), Math.toRadians(226))
                 .build();
 
         zhunbeixidiyipai = follower.pathBuilder()
@@ -112,31 +129,26 @@ public class BLUE23close18 extends OpMode {
     public void autonomousPathUpdate() {
         switch (pathState) {
             case 10:
-                follower.setMaxPower(0.7);
-                follower.followPath(diyigepaoda, false);
+                flywheel.setTargetRPM(3250);
+                follower.followPath(diyigepaoda, true);
                 turret.setTargetAngle(-48.0);
-                flywheel.setTargetRPM(4000.0);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(11);
                 break;
             case 11:
-                if (pathTimer.getElapsedTimeSeconds() >= 1.2) {
-                    intakeShooter.startBlindShoot(0.5);
+                if (!follower.isBusy()) {
+                    setPathState(115);
+                }
+                break;
+            case 115:
+                if (pathTimer.getElapsedTimeSeconds() >= 0) {
+                    intakeShooter.startPrecisionShoot(0.5);
                     setPathState(12);
                 }
                 break;
             case 12:
                 if (!intakeShooter.isShootingActive()) {
                     follower.setMaxPower(1.0);
-                    setPathState(13);
-                }
-                else if (!follower.isBusy()) {
-                    follower.setMaxPower(1.0);
-                    setPathState(20);
-                }
-                break;
-            case 13:
-                if (!follower.isBusy()) {
                     setPathState(20);
                 }
                 break;
@@ -291,7 +303,7 @@ public class BLUE23close18 extends OpMode {
 
             case 110:
                 follower.followPath(Returntofixedlaunchpoint, true);
-                turret.setTargetAngle(-27.0);
+                turret.setTargetAngle(-26.0);
                 flywheel.setTargetRPM(3250.0);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(111);
