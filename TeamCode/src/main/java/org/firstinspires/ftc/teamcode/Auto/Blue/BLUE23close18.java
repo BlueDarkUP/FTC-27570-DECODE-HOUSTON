@@ -12,7 +12,7 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.Subsystems.ForAuto.*;
 
-@Autonomous(name = "近点18球自动（嘬2吸三）", group = "Autonomous")
+@Autonomous(name = "近点18球自动", group = "Autonomous")
 public class BLUE23close18 extends OpMode {
 
     // 结构/底盘控制 (直接沿用 PedroPathing)
@@ -62,12 +62,12 @@ public class BLUE23close18 extends OpMode {
                 .build();
 
         kaimenzuo = follower.pathBuilder()
-                .addPath(new BezierCurve(new Pose(60.000, 83.000), new Pose(45.000, 60.000), new Pose(12.3, 59.5)))
+                .addPath(new BezierCurve(new Pose(60.000, 83.000), new Pose(45.000, 60.000), new Pose(11.5, 59.5)))
                 .setLinearHeadingInterpolation(Math.toRadians(226), Math.toRadians(150))
                 .build();
 
         fashekaimenzuo = follower.pathBuilder()
-                .addPath(new BezierCurve(new Pose(12.3, 59.5), new Pose(35.000, 47.000), new Pose(60.000, 83.000)))
+                .addPath(new BezierCurve(new Pose(11.5, 59.5), new Pose(35.000, 47.000), new Pose(60.000, 83.000)))
                 .setLinearHeadingInterpolation(Math.toRadians(150), Math.toRadians(226))
                 .build();
 
@@ -166,8 +166,8 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 315:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.4) {
-                    intakeShooter.startPrecisionShoot(0.6);
+                if (pathTimer.getElapsedTimeSeconds() >= 0) {
+                    intakeShooter.startPrecisionShoot(0.5);
                     setPathState(32);
                 }
                 break;
@@ -190,7 +190,7 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 42:
-                if (pathTimer.getElapsedTimeSeconds() >= 2) {
+                if (pathTimer.getElapsedTimeSeconds() >= 2.2) {
                     setPathState(50);
                 }
                 break;
@@ -208,8 +208,8 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 515:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.4) {
-                    intakeShooter.startPrecisionShoot(0.6);
+                if (pathTimer.getElapsedTimeSeconds() >= 0) {
+                    intakeShooter.startPrecisionShoot(0.5);
                     setPathState(52);
                 }
                 break;
@@ -259,8 +259,8 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 815:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.4) {
-                    intakeShooter.startPrecisionShoot(0.6);
+                if (pathTimer.getElapsedTimeSeconds() >= 0) {
+                    intakeShooter.startPrecisionShoot(0.5);
                     setPathState(82);
                 }
                 break;
@@ -302,8 +302,8 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 1115:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.4) {
-                    intakeShooter.startPrecisionShoot(0.6);
+                if (pathTimer.getElapsedTimeSeconds() >= 0) {
+                    intakeShooter.startPrecisionShoot(0.5);
                     setPathState(112);
                 }
                 break;

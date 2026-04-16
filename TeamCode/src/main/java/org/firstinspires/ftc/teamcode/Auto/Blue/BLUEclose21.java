@@ -81,8 +81,8 @@ public class BLUEclose21 extends OpMode {
                 .build();
 
         //TODO:TTT
-        double kaimenzuox = 13;
-        double kaimenzuoy = 61;
+        double kaimenzuox = 11.5;
+        double kaimenzuoy = 61.5;
 
         kaimenzuo1 = follower.pathBuilder()
                 .addPath(
@@ -203,7 +203,7 @@ public class BLUEclose21 extends OpMode {
             // ================== 第1阶段：停靠并发射 ==================
             case 10:
                 // 修改：将跑打(false)改为停靠(true)
-                flywheel.setTargetRPM(3600.0);
+                flywheel.setTargetRPM(3250);
                 follower.followPath(fasheyuzhi, true);
                 turret.setTargetAngle(-48.0);
                 // 修改：目标转速设为3600
@@ -446,7 +446,7 @@ public class BLUEclose21 extends OpMode {
             // ================== 第13阶段：最后一次停靠并发射 ==================
             case 130:
                 follower.followPath(huiqufashe6, true);
-                turret.setTargetAngle(-26); // 只有最后一次云台角度是 -27.0
+                turret.setTargetAngle(15); // 只有最后一次云台角度是 -27.0
                 flywheel.setTargetRPM(3250.0);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(131);
