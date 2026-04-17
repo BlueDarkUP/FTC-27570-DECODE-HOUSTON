@@ -227,7 +227,6 @@ public class BLUEclose21 extends OpMode {
             case 12:
                 // 严格等待射击动作完全结束
                 if (!intakeShooter.isShootingActive()) {
-                    follower.setMaxPower(1.0);
                     // 射击完成且底盘已经到位，直接进入第2阶段
                     setPathState(20);
                 }
@@ -248,7 +247,6 @@ public class BLUEclose21 extends OpMode {
 
             // ================== 第3阶段：发射（吸完第二排后）==================
             case 30:
-                follower.setMaxPower(1);
                 follower.followPath(huiqufashe1, true);
                 turret.setTargetAngle(-53.0);
                 flywheel.setTargetRPM(3250.0);

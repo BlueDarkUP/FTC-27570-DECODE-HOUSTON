@@ -17,18 +17,22 @@ public class AutoAimSubsystem {
     private Servo LP;
     private Servo RP;
 
-    // PID 参数：负责微调和最终锁定的精准度
+    // 基础 PIDF
     public static double TURRET_kP = 55.0;
     public static double TURRET_kI = 0.0;
     public static double TURRET_kD = 0.3;
     public static double TURRET_kF = 0.0001;
 
-    // 基础前馈：kV 对应速度，kS 对应静摩擦
+    //角速度前馈
     public static double TURRET_kV = 0.001;
+
+    //克服静摩擦
     public static double TURRET_kS = 0.1;
 
+    //加速度前馈
     public static double TURRET_kA = 0.0001;
 
+    //目标前馈（预测目标一段时间之后的位置且瞄准
     public static double TURRET_LATENCY = 0.01;
 
     // 死区与最大功率
@@ -39,12 +43,12 @@ public class AutoAimSubsystem {
     public static double TURRET_FILTER_ALPHA = 0.7;
     public static double TURRET_VEL_FILTER_ALPHA = 0.9;
 
-    // 预测刹车控制常数 (由 TurretPredictiveBrakingTuner 测得)
+    // 预测刹车
     public static double TURRET_kLinearBraking = 0.01765;
     public static double TURRET_kQuadraticFriction = 0.000086;
 
     private PIDFController turretPIDF;
-    private final double TICKS_PER_REV = 32798.0;
+    private final double TICKS_PER_REV = 32798.0;  //云台转一圈的编码器tick数
 
     // 俯仰角伺服参数
     private final double LP_UP = 1.0;
@@ -52,13 +56,12 @@ public class AutoAimSubsystem {
     private final double RP_UP = 0.0;
     private final double RP_DOWN = 0.5;
 
-    // 状态存储变量
     private double filteredTurretRelAngle = 0.0;
     private boolean isFilterInitialized = false;
 
     private double lastTurretRelAngle = 0.0;
     private double filteredTurretVel = 0.0;
-    private double lastTargetVel = 0.0; // 用于计算加速度前馈
+    private double lastTargetVel = 0.0;
     private long lastTime = 0;
 
     public static class TurretCommand {
@@ -67,7 +70,8 @@ public class AutoAimSubsystem {
         public double targetPitch = 0.0;
         public boolean isAimLocked = false;
         public boolean isUnwinding = false;
-        public double currentTolerance = 1.0; // 新增：用于 TeleOp 显示当前的容错阈值
+        public double currentTolerance = 1.0;
+        public double targetDist = 0.0;
     }
 
     public AutoAimSubsystem(HardwareMap hardwareMap) {
@@ -119,14 +123,11 @@ public class AutoAimSubsystem {
             command.hasTarget = true;
             command.targetRpm = aimResult.rpm;
             command.targetPitch = aimResult.pitch;
+            command.targetDist = aimResult.dist;
 
-            // --- 线性变化容错计算 (20in -> 5deg, 150in -> 1deg) ---
-            // 公式：y = y1 + (y2 - y1) / (x2 - x1) * (x - x1)
             double calculatedTolerance = 5.0 + (1.0 - 5.0) / (150.0 - 20.0) * (aimResult.dist - 20.0);
-            // 限制范围在 1.0 到 5.0 之间
             command.currentTolerance = Math.max(1.0, Math.min(5.0, calculatedTolerance));
 
-            // --- 1. 时间、角度读取与低通滤波 ---
             long currentTime = System.nanoTime();
             double dt = (lastTime == 0) ? 0 : (currentTime - lastTime) / 1e9;
             lastTime = currentTime;
@@ -149,22 +150,18 @@ public class AutoAimSubsystem {
             }
             lastTurretRelAngle = rawTurretRelAngle;
 
-            // --- 2. 运动学前馈计算 (Translational Kinematic FF) ---
             double dx = targetX - robotX;
             double dy = targetY - robotY;
             double distSq = dx * dx + dy * dy;
             double translationalOmegaDeg = 0.0;
 
             if (distSq > 0.001) {
-                // 计算目标相对于机器人的角速度 (World Frame)
                 double omegaRad = (-dx * globalVy + dy * globalVx) / distSq;
                 translationalOmegaDeg = Math.toDegrees(omegaRad);
             }
 
-            // --- 3. 延迟补偿逻辑 (Latency Compensation) ---
             double compensatedTargetAbsAngle = aimResult.algYaw + (translationalOmegaDeg * TURRET_LATENCY);
 
-            // --- 4. 误差计算与 Unwind 逻辑 ---
             double currentTurretAbsAngle = currentHeadingDeg + filteredTurretRelAngle;
             double error = compensatedTargetAbsAngle - currentTurretAbsAngle;
 
@@ -183,10 +180,8 @@ public class AutoAimSubsystem {
                 command.isUnwinding = false;
             }
 
-            // 使用计算出的动态容错阈值进行判定
             command.isAimLocked = Math.abs(error) <= command.currentTolerance;
 
-            // --- 5. 预测刹车 (仅在 Unwinding 时启用) ---
             double brakingDist = 0.0;
             double predictedRelAngle = filteredTurretRelAngle;
             if (command.isUnwinding) {
@@ -195,7 +190,6 @@ public class AutoAimSubsystem {
                 predictedRelAngle = filteredTurretRelAngle + (Math.signum(filteredTurretVel) * brakingDist);
             }
 
-            // --- 6. 动力融合 (PID + kV + kA + kS) ---
             double pidOutputVel = turretPIDF.calculate(predictedRelAngle, targetTurretRelAngle);
             double feedforwardVel = -robotAngularVelocityDeg + translationalOmegaDeg;
             double finalTargetVel = pidOutputVel + feedforwardVel;
@@ -222,12 +216,10 @@ public class AutoAimSubsystem {
             Turret.setPower(turretPower);
             setPitchServos(command.targetPitch);
 
-            // --- 7. Dashboard 遥测 ---
             TelemetryPacket packet = new TelemetryPacket();
-            drawAnalysis(packet.fieldOverlay(), robotX, robotY, currentHeadingDeg, filteredTurretRelAngle, aimResult.algYaw, targetX, targetY);
-
             packet.put("Turret/Error", error);
-            packet.put("Turret/CurrentTolerance", command.currentTolerance); // 方便在 Dashboard 观察当前容错
+            packet.put("Turret/CurrentTolerance", command.currentTolerance);
+            packet.put("Turret/TargetDist", command.targetDist);
             packet.put("Turret/TargetVel", finalTargetVel);
             packet.put("Turret/IsUnwinding", command.isUnwinding);
 
@@ -241,19 +233,6 @@ public class AutoAimSubsystem {
         return command;
     }
 
-    private void drawAnalysis(Canvas canvas, double x, double y, double heading, double turretRel, double targetAbs, double tx, double ty) {
-        canvas.setStrokeWidth(1);
-        canvas.setStroke("blue");
-        canvas.strokeCircle(x, y, 9);
-        canvas.setStroke("green");
-        canvas.strokeLine(x, y, tx, ty);
-        double actualAbsRad = Math.toRadians(heading + turretRel);
-        double lineLen = 30.0;
-        canvas.setStroke("red");
-        canvas.strokeLine(x, y, x + Math.cos(actualAbsRad) * lineLen, y + Math.sin(actualAbsRad) * lineLen);
-        canvas.setStroke("yellow");
-        canvas.strokeCircle(tx, ty, 2);
-    }
 
     public void stop() {
         Turret.setPower(0);

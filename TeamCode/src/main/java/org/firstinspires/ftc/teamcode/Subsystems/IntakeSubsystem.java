@@ -55,8 +55,9 @@ public class IntakeSubsystem {
      * @param isUnwinding     是否需要云台复位/退弹
      * @param isAimLocked     云台是否已锁定目标
      * @param isFlywheelReady 飞轮转速是否已达标就绪
+     * @param targetDist      距离目标的实时距离 (用于动态调节发射速度)
      */
-    public void update(boolean isShootingMode, boolean hasTarget, boolean isUnwinding, boolean isAimLocked, boolean isFlywheelReady) {
+    public void update(boolean isShootingMode, boolean hasTarget, boolean isUnwinding, boolean isAimLocked, boolean isFlywheelReady, double targetDist) {
         double currentTime = runtime.seconds();
         double intakeCurrent = motorIntake.getCurrent(CurrentUnit.AMPS);
 
@@ -66,7 +67,7 @@ public class IntakeSubsystem {
             // 云台退弹复位逻辑
             if (hasTarget && isUnwinding) {
                 if (!wasUnwinding) {
-                    unwindReverseEndTime = currentTime + 0.35;
+                    unwindReverseEndTime = currentTime + 0.2;
                 }
 
                 if (currentTime < unwindReverseEndTime) {
@@ -78,10 +79,14 @@ public class IntakeSubsystem {
                 }
                 intakeBrakeReleaseTime = 0.0;
             } else {
-                // 动态射击推弹逻辑
                 if (hasTarget && isFlywheelReady && isAimLocked) {
-                    motorIntake.setPower(1.0);
-                    systemStatusMessage = "⚡ 动态射击中 (FIRE ON THE MOVE)!";
+                    if (targetDist < 110.0) {
+                        motorIntake.setPower(1.0);
+                        systemStatusMessage = "⚡ 动态射击中 (近距离 1.0 满力)!";
+                    } else {
+                        motorIntake.setPower(0.75);
+                        systemStatusMessage = "⚡ 动态射击中 (远距离 0.75 降速)!";
+                    }
                 } else {
                     motorIntake.setPower(0.0);
                     if (!hasTarget) {
@@ -111,8 +116,8 @@ public class IntakeSubsystem {
                 systemStatusMessage = "⚠️ INTAKE堵转保护触发！(刹车冷却中)";
                 isStalling = false;
             } else {
-                motorIntake.setPower(0.8);
-                systemStatusMessage = "怠速中 (Intake 常转收件)";
+                motorIntake.setPower(1.0);
+                systemStatusMessage = "怠速中 (Intake 常转收件 最大速度 0.8)";
             }
         }
 

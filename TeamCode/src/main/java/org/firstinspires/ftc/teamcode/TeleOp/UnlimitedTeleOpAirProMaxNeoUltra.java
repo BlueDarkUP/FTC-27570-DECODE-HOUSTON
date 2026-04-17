@@ -33,14 +33,13 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
     private boolean isShootingMode = false;
     private boolean lastCircleState = false;
 
-    private boolean isPreSpoolingMode = false;
-    private boolean lastCrossState = false;
-
+    // 修改：删除了 lastCrossState 和 isPreSpoolingMode，因为现在手动模式默认预热
     private boolean isManualMode = false;
     private boolean lastLeftBumperState = false;
     private boolean lastSquareState = false;
+
     private double manualTargetDistance = 25.0;
-    private boolean manualIdleOverride = false;
+    // 修改：删除了 manualIdleOverride，现在策略是实时根据距离结算
 
     private double headingOffset = 0.0;
 
@@ -65,7 +64,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
         flywheelSubsystem = new FlywheelSubsystem(hardwareMap);
         intakeSubsystem = new IntakeSubsystem(hardwareMap);
 
-        telemetry.addLine("Ready to Start - Drive, Odometry, Turret, Flywheel & Intake are Active!");
+        telemetry.addLine("Ready to Start - Drive, Odometry, Turret, Flywheel & Intake Active!");
         telemetry.update();
 
         waitForStart();
@@ -80,7 +79,6 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             double rx_odo = pos.getX(DistanceUnit.INCH);
             double ry_odo = pos.getY(DistanceUnit.INCH);
             double rawHeadingDeg = pos.getHeading(AngleUnit.DEGREES);
-
             double currentHeadingDeg = rawHeadingDeg - headingOffset;
 
             double robotVx = odo.getVelX(DistanceUnit.INCH);
@@ -100,106 +98,100 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
             driveSubsystem.driveFieldCentric(x, y, rx_drive, currentHeadingDeg);
 
+            // Square (X) 退出射击模式
             boolean currentSquareState = gamepad1.x;
             if (currentSquareState && !lastSquareState) {
                 isShootingMode = false;
-                isPreSpoolingMode = false;
-                if (isManualMode) manualIdleOverride = true;
             }
             lastSquareState = currentSquareState;
 
+            // Circle (B) 开启/切换射击模式
             boolean currentCircleState = gamepad1.b;
             if (currentCircleState && !lastCircleState) {
                 isShootingMode = !isShootingMode;
             }
             lastCircleState = currentCircleState;
 
-            boolean currentCrossState = gamepad1.a;
-            if (currentCrossState && !lastCrossState) {
-                isPreSpoolingMode = !isPreSpoolingMode;
-            }
-            lastCrossState = currentCrossState;
-
+            // Left Bumper 切换手动/自动自瞄档
             boolean currentLeftBumperState = gamepad1.left_bumper;
             if (currentLeftBumperState && !lastLeftBumperState) {
                 isManualMode = !isManualMode;
-                if (isManualMode) manualIdleOverride = false;
             }
             lastLeftBumperState = currentLeftBumperState;
 
+            // 手动模式下的预设距离切换
             if (isManualMode) {
-                if (gamepad1.dpad_left) { manualTargetDistance = 25.0; manualIdleOverride = false; }
-                else if (gamepad1.dpad_up) { manualTargetDistance = 54.23; manualIdleOverride = false; }
-                else if (gamepad1.dpad_right) { manualTargetDistance = 88.0; manualIdleOverride = false; }
-                else if (gamepad1.dpad_down) { manualTargetDistance = 150.0; manualIdleOverride = false; }
+                if (gamepad1.dpad_left) { manualTargetDistance = 25.0; }
+                else if (gamepad1.dpad_up) { manualTargetDistance = 54.23; }
+                else if (gamepad1.dpad_right) { manualTargetDistance = 88.0; }
+                else if (gamepad1.dpad_down) { manualTargetDistance = 150.0; }
             }
 
             boolean isEmergencyBrake = gamepad1.right_bumper;
-            boolean isPreSpoolingActive = (!isManualMode && isPreSpoolingMode);
-
             double robotOmega = odo.getHeadingVelocity(AngleUnit.DEGREES.getUnnormalized());
+
+            // 获取自瞄结算
             AutoAimSubsystem.TurretCommand aimCommand = autoAimSubsystem.update(
-                    rx_odo, ry_odo, globalVx, globalVy, currentHeadingDeg,robotOmega,
+                    rx_odo, ry_odo, globalVx, globalVy, currentHeadingDeg, robotOmega,
                     TARGET_X_WORLD, TARGET_Y_WORLD,
                     isManualMode, manualTargetDistance
             );
 
-            double targetVelocityRPM = FlywheelSubsystem.IDLE_VELOCITY;
+            double targetVelocityRPM = FlywheelSubsystem.IDLE_VELOCITY_MIN;
             String flywheelActionState = "怠速 (Idle)";
 
             if (isEmergencyBrake) {
                 targetVelocityRPM = 0;
-                flywheelActionState = "紧急刹车 (E-Brake)";
+                flywheelActionState = "紧急刹车 (E-Brake/电制动)";
                 bbb.setPosition(0);
             } else if (isShootingMode) {
+                // 射击模式：完全释放结算转速，上限 4900
                 bbb.setPosition(0.18);
                 if (aimCommand.hasTarget) {
-                    targetVelocityRPM = aimCommand.targetRpm;
-                    flywheelActionState = "开火中 (Shooting)";
+                    targetVelocityRPM = Math.min(FlywheelSubsystem.SHOOT_MAX, aimCommand.targetRpm);
+                    flywheelActionState = "开火中 (Shooting - 全速解锁)";
+                }
+            } else if (isManualMode) {
+                // 手动档默认实时预热：限制在 [2900, 4000]
+                bbb.setPosition(0);
+                if (aimCommand.hasTarget) {
+                    // 实时结算但限制在 4000 以下
+                    double calculatedRpm = aimCommand.targetRpm;
+                    targetVelocityRPM = Math.max(FlywheelSubsystem.IDLE_VELOCITY_MIN, Math.min(FlywheelSubsystem.PRE_SPOOL_MAX, calculatedRpm));
+                    flywheelActionState = "自适应预热 (2900-4000 动态限速)";
+                } else {
+                    targetVelocityRPM = FlywheelSubsystem.IDLE_VELOCITY_MIN;
+                    flywheelActionState = "手动底噪怠速 (2900)";
                 }
             } else {
+                // 非手动且非射击：进入标准低功耗怠速
                 bbb.setPosition(0);
-                if (isManualMode && !manualIdleOverride && aimCommand.hasTarget) {
-                    targetVelocityRPM = aimCommand.targetRpm;
-                    flywheelActionState = "手动档持续预热 (Manual Spooling)";
-                } else if (isPreSpoolingActive && aimCommand.hasTarget) {
-                    targetVelocityRPM = aimCommand.targetRpm;
-                    flywheelActionState = "战斗姿态预蓄力 (Pre-spooling) [Cross键已锁定]";
-                } else {
-                    targetVelocityRPM = FlywheelSubsystem.IDLE_VELOCITY;
-                    flywheelActionState = "怠速 (Idle)";
-                }
+                targetVelocityRPM = FlywheelSubsystem.IDLE_VELOCITY_MIN;
+                flywheelActionState = "自动档空闲 (2900)";
             }
 
-            boolean isActiveSpooling = (!isShootingMode && !isPreSpoolingActive && (!isManualMode || manualIdleOverride)) ? false : true;
-
+            // 更新飞轮：在手动模式或射击模式下，都视为 isActiveSpooling = true (用于判断就绪和应用 Bang-Bang)
+            boolean isActiveSpooling = (isShootingMode || isManualMode) && !isEmergencyBrake;
             flywheelSubsystem.update(targetVelocityRPM, isEmergencyBrake, isActiveSpooling);
-            boolean rpmOK = flywheelSubsystem.isReady();
 
+            boolean rpmOK = flywheelSubsystem.isReady();
             boolean effectiveAimLocked = isManualMode ? true : aimCommand.isAimLocked;
 
-            intakeSubsystem.update(isShootingMode, aimCommand.hasTarget, aimCommand.isUnwinding, effectiveAimLocked, rpmOK);
+            intakeSubsystem.update(isShootingMode, aimCommand.hasTarget, aimCommand.isUnwinding, effectiveAimLocked, rpmOK, aimCommand.targetDist);
 
-            telemetry.addData("操作模式", isManualMode ? "🛠️ [手动控制档] (屏蔽动态预测)" : "🤖 [自动自瞄档]");
-            telemetry.addData("当前动作", isShootingMode ? "[ 发射模式 ]" : "[ 怠速/收集模式 ]");
+            // Telemetry 更新
+            telemetry.addData("操作模式", isManualMode ? "🛠️ [手动控制档] (自适应预热激活)" : "🤖 [自动自瞄档]");
+            telemetry.addData("当前动作", flywheelActionState);
 
-            telemetry.addData("Odo X / Y", "%.1f / %.1f", rx_odo, ry_odo);
-            telemetry.addData("Heading", "%.1f", currentHeadingDeg);
-
-            telemetry.addLine("--- 发射系统状态 ---");
+            telemetry.addLine("--- 实时控制状态 ---");
             if (aimCommand.hasTarget) {
-                telemetry.addData("云台锁定", effectiveAimLocked ? "✅ LOCKED" : "⏳ 追踪中");
-                telemetry.addData("计算 Pitch", "%.3f", aimCommand.targetPitch);
+                telemetry.addData("理论结算转速", "%.1f RPM", aimCommand.targetRpm);
+                telemetry.addData("目标距离", "%.1f in", aimCommand.targetDist);
             }
-            telemetry.addData("推弹机构", isShootingMode ? "发射推弹态 (0.18)" : "归位态 (0.0)");
-            telemetry.addData("Intake 状态", intakeSubsystem.getStatusMessage());
-
-            telemetry.addLine("--- 飞轮系统状态 ---");
-            telemetry.addData("飞轮策略", flywheelActionState);
-            telemetry.addData("瞬态接管", flywheelSubsystem.getActiveBoostState());
-            telemetry.addData("飞轮目标 RPM", targetVelocityRPM);
-            telemetry.addData("飞轮当前 RPM", flywheelSubsystem.getCurrentRPM());
-            telemetry.addData("飞轮转速是否达标", rpmOK ? "✅ 已满转" : "⏳ 蓄力/怠速中...");
+            telemetry.addData("飞轮目标 RPM", "%.1f", targetVelocityRPM);
+            telemetry.addData("飞轮当前 RPM", "%.1f", flywheelSubsystem.getCurrentRPM());
+            telemetry.addData("状态", rpmOK ? "✅ READY" : "⏳ 调整中 (支持电制动降速)");
+            telemetry.addData("加速策略", flywheelSubsystem.getActiveBoostState());
 
             telemetry.update();
         }

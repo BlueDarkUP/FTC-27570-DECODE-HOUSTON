@@ -4,21 +4,33 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 public class FlywheelSubsystem {
 
     private DcMotorEx motorSH;
     private DcMotorEx motorHS;
+    private VoltageSensor batteryVoltageSensor;
 
-    public static final double IDLE_VELOCITY = 3000.0;
-    private final double RPM_LOWER_BOUND = 3000.0;
-    private final double RPM_UPPER_BOUND = 5050.0;
+    // 常量定义
+    public static final double IDLE_VELOCITY_MIN = 3000.0;
+    public static final double PRE_SPOOL_MAX = 4100.0;
+    public static final double SHOOT_MAX = 4900.0;
+
+    private final double RPM_LOWER_BOUND = 4250.0;
+    private final double RPM_UPPER_BOUND = 4850.0;
     private final double MAX_TOLERANCE = 1000;
-    private final double MIN_TOLERANCE = 1000;
-    private final double SPOOL_UP_TOLERANCE = 100.0;
+    private final double MIN_TOLERANCE = 50;
+    private final double SPOOL_UP_TOLERANCE = 50.0;
 
-    private final double kP = 0.011, kI = 0.0004, kD = 0.00000023, kF = 0.00033;
+    // PIDF 参数
+    public static double kP = 0.0016;
+    public static double kI = 0.000;
+    public static double kD = 0.000;
+    public static double kV = 0.0003;
+    public static double kS = 0.0991;
+
     private final double TICKS_PER_REV = 28.0;
 
     private ElapsedTime timer = new ElapsedTime();
@@ -27,11 +39,13 @@ public class FlywheelSubsystem {
 
     private boolean isFlywheelReady = false;
     private double currentRPM = 0.0;
-    private String activeBoost = "None";
+    private String activeBoost = "None (纯PIDF)";
 
     public FlywheelSubsystem(HardwareMap hardwareMap) {
         motorSH = hardwareMap.get(DcMotorEx.class, "SH");
         motorHS = hardwareMap.get(DcMotorEx.class, "HS");
+
+        batteryVoltageSensor = hardwareMap.voltageSensor.iterator().next();
 
         motorSH.setDirection(DcMotorSimple.Direction.FORWARD);
         motorHS.setDirection(DcMotorSimple.Direction.REVERSE);
@@ -39,27 +53,19 @@ public class FlywheelSubsystem {
         motorSH.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         motorHS.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
-        motorSH.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
-        motorHS.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+        // BRAKE 模式，在 power 为 0 时提供更强的阻尼，配合反转电流更快减速
+        motorSH.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        motorHS.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
     }
 
-    /**
-     * 在主程序的 waitForStart() 之后调用，重置计时器防止首个循环时间 dt 过大
-     */
     public void start() {
         timer.reset();
         lastErrorTPS = 0;
         integralSum = 0;
     }
 
-    /**
-     * 飞轮核心更新与PID控制函数
-     *
-     * @param targetVelocityRPM 目标RPM
-     * @param isEmergencyBrake  是否处于紧急刹车模式
-     * @param isActiveSpooling  是否处于主动蓄力/射击状态 (用于判断是否需要Bang-Bang和判断就绪)
-     */
     public void update(double targetVelocityRPM, boolean isEmergencyBrake, boolean isActiveSpooling) {
+        // 动态容差计算
         double dynamicTolerance;
         if (targetVelocityRPM <= RPM_LOWER_BOUND) {
             dynamicTolerance = MAX_TOLERANCE;
@@ -73,8 +79,8 @@ public class FlywheelSubsystem {
         double currentVelTPS = motorSH.getVelocity();
         double targetVelTPS = (targetVelocityRPM * TICKS_PER_REV) / 60.0;
         currentRPM = (currentVelTPS * 60.0) / TICKS_PER_REV;
-        double errorRPM = targetVelocityRPM - currentRPM;
 
+        // 就绪状态逻辑
         if (!isActiveSpooling) {
             isFlywheelReady = false;
         } else {
@@ -106,30 +112,32 @@ public class FlywheelSubsystem {
         double derivative = (errorTPS - lastErrorTPS) / dt;
         lastErrorTPS = errorTPS;
 
-        double power = (kF * targetVelTPS) + (kP * errorTPS) + (kI * integralSum) + (kD * derivative);
+        double currentVoltage = batteryVoltageSensor.getVoltage();
 
-        double bangBangThreshold = Math.max(50.0, Math.abs(dynamicTolerance) - (Math.abs(dynamicTolerance) / 7.0));
-        activeBoost = "None";
-
-        if (isActiveSpooling && targetVelocityRPM > 100) {
-            if (errorRPM > bangBangThreshold) {
-                power = 1.0;
-                integralSum = 0;
-                activeBoost = "Bang-Bang (极速补电)";
-            }
+        // Feedforward：只在目标大于0时施加，防止在静止时抖动
+        double feedforward = 0.0;
+        if (targetVelTPS > 0) {
+            feedforward = kS * Math.signum(targetVelTPS) + kV * targetVelTPS;
         }
 
+        double pid = (kP * errorTPS) + (kI * integralSum) + (kD * derivative);
+
+        // 基础功率计算与电压补偿
+        double basePower = feedforward + pid;
+        double power = basePower * (12.9 / currentVoltage);
+
+        // 停机处理
         if (targetVelocityRPM <= 0 || isEmergencyBrake) {
             power = 0;
             integralSum = 0;
         }
 
-        power = Math.max(0.0, Math.min(1.0, power));
+        // 限制在 -1.0 到 1.0 之间，允许负数产生反转电流快速减速
+        power = Math.max(-1.0, Math.min(1.0, power));
+
         motorSH.setPower(power);
         motorHS.setPower(power);
     }
-
-    // --- 状态读取接口 ---
 
     public boolean isReady() {
         return isFlywheelReady;

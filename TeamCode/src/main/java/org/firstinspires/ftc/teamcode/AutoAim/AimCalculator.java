@@ -37,7 +37,7 @@ public class AimCalculator {
     public static double P6_TIME = 0.8;
 
     public static double P7_DIST = 150.0;
-    public static double P7_RPM = 4850;
+    public static double P7_RPM = 4900;
     public static double P7_PITCH = 1.0;
     public static double P7_TIME = 0.9;
 
