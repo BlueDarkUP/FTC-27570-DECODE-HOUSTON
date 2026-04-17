@@ -137,8 +137,9 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             boolean isEmergencyBrake = gamepad1.right_bumper;
             boolean isPreSpoolingActive = (!isManualMode && isPreSpoolingMode);
 
+            double robotOmega = odo.getHeadingVelocity(AngleUnit.DEGREES.getUnnormalized());
             AutoAimSubsystem.TurretCommand aimCommand = autoAimSubsystem.update(
-                    rx_odo, ry_odo, globalVx, globalVy, currentHeadingDeg,
+                    rx_odo, ry_odo, globalVx, globalVy, currentHeadingDeg,robotOmega,
                     TARGET_X_WORLD, TARGET_Y_WORLD,
                     isManualMode, manualTargetDistance
             );
