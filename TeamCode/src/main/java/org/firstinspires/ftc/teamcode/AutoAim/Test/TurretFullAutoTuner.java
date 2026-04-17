@@ -21,29 +21,20 @@ public class TurretFullAutoTuner extends OpMode {
 
     public static double TICKS_PER_REV = 32768.0; //TODO: 确认实际云台绕一圈编码器读数
 
-    // =====================================
-    // 调试器安全与逻辑参数
-    // =====================================
-    public static double MAX_SAFE_ANGLE = 150.0;     // 测试时的云台绝对限位
-    public static double BRAKE_BUFFER_ANGLE = 35.0;  // 加大缓冲：距离极限多少度提前介入回中/刹车
-    public static double RETURN_POWER = 0.3;         // 每次测试结束后，回中使用的力量
-    public static int REST_TIME_MS = 500;            // 测试间隔休息时间
+    public static double MAX_SAFE_ANGLE = 150.0;
+    public static double BRAKE_BUFFER_ANGLE = 35.0;
+    public static double RETURN_POWER = 0.3;
+    public static int REST_TIME_MS = 500;
 
-    // =====================================
-    // 测试用例阶梯配置 (已更新为你的要求)
-    // =====================================
     public static double[] KV_TEST_POWERS = {0.3, 0.45, 0.6, 0.75, 0.8, 0.9, 1.0};
-    public static double[] KA_TEST_POWERS = {0.5, 0.7, 0.9, 1.0};
+    public static double[] KA_TEST_POWERS = {0.35, 0.5, 0.7, 0.9, 1.0};
     public static double[] PB_TEST_POWERS = {1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3};
-    public static double PB_BRAKING_POWER = 0.3;     // 刹车测试时的固定反向力量
-    public static int PB_SPIN_TIME_MS = 3000;        // 刹车测试时加速的最大超时时间
+    public static double PB_BRAKING_POWER = 0.3;
+    public static int PB_SPIN_TIME_MS = 3000;
 
-    // =====================================
-    // 滤波与补偿算法参数
-    // =====================================
     public static double VEL_FILTER_ALPHA = 0.85;
     public static double ACCEL_FILTER_ALPHA = 0.20;
-    public static double NOMINAL_VOLTAGE = 12.0;     // 归一化基准电压
+    public static double NOMINAL_VOLTAGE = 12.0;
 
     private enum State {
         START,
@@ -65,12 +56,10 @@ public class TurretFullAutoTuner extends OpMode {
     private double filteredAccel = 0.0;
     private boolean isInitialized = false;
 
-    // 电压监测
     private double currentVoltage = 12.0;
     private double sumVoltage = 0.0;
     private int voltageSamples = 0;
 
-    // 运行态变量
     private int iteration = 0;
     private int currentDirection = 1;
     private double currentTestPower = 0.0;
@@ -107,13 +96,11 @@ public class TurretFullAutoTuner extends OpMode {
         lastTime = System.nanoTime();
     }
 
-    /** 强制状态切换封装，确保计时器重置 */
     private void switchState(State newState) {
         state = newState;
         timer.reset();
     }
 
-    /** 健壮的电池电压读取，防止获取到 0V 的 Dummy 传感器 */
     private double getBatteryVoltage() {
         double maxVoltage = 0;
         for (VoltageSensor sensor : hardwareMap.voltageSensor) {
@@ -135,7 +122,6 @@ public class TurretFullAutoTuner extends OpMode {
         double currentTicks = Turret.getCurrentPosition();
         double currentAngle = (currentTicks / TICKS_PER_REV) * 360.0;
 
-        // 电压轮询
         if (voltageTimer.milliseconds() > 250 && state != State.DONE && state != State.CALCULATE) {
             currentVoltage = getBatteryVoltage();
             sumVoltage += currentVoltage;
@@ -152,7 +138,6 @@ public class TurretFullAutoTuner extends OpMode {
             return;
         }
 
-        // 滤波
         double rawVel = (currentAngle - lastAngle) / dt;
         filteredVel = (VEL_FILTER_ALPHA * rawVel) + ((1.0 - VEL_FILTER_ALPHA) * filteredVel);
 
@@ -166,7 +151,6 @@ public class TurretFullAutoTuner extends OpMode {
         boolean hitSafetyLimit = (currentAngle >= limitThreshold && currentDirection == 1) ||
                 (currentAngle <= -limitThreshold && currentDirection == -1);
 
-        // 【关键修复1】全局物理极限保护：不再跳转到 DONE，而是跳转到 CALCULATE 结算已收集的数据！
         if (Math.abs(currentAngle) > (MAX_SAFE_ANGLE + 15) && !isReturningState(state) && state != State.DONE && state != State.CALCULATE) {
             Turret.setPower(0);
             telemetry.addLine("!!! DANGER: PAST MAX SAFE ANGLE !!! FORCING EARLY CALCULATION");
@@ -180,7 +164,6 @@ public class TurretFullAutoTuner extends OpMode {
                 switchState(State.KS_RUN);
                 break;
 
-            // ================== kS 测算 ==================
             case KS_RUN:
                 if (iteration >= 2) {
                     double sum = 0;
@@ -217,7 +200,6 @@ public class TurretFullAutoTuner extends OpMode {
                 }
                 break;
 
-            // ================== kV 测算 ==================
             case KV_RUN:
                 if (iteration >= KV_TEST_POWERS.length * 2) {
                     iteration = 0;
@@ -256,7 +238,6 @@ public class TurretFullAutoTuner extends OpMode {
                 }
                 break;
 
-            // ================== kA 测算 ==================
             case KA_RUN:
                 if (iteration >= KA_TEST_POWERS.length * 2) {
                     iteration = 0;
@@ -297,7 +278,6 @@ public class TurretFullAutoTuner extends OpMode {
                 }
                 break;
 
-            // ================== PB 测算 ==================
             case PB_RUN:
                 if (iteration >= PB_TEST_POWERS.length * 2) {
                     switchState(State.CALCULATE);
@@ -319,7 +299,6 @@ public class TurretFullAutoTuner extends OpMode {
                 break;
 
             case PB_BRAKE:
-                // 【关键修复2】加入延时判定 timer > 150，防止进入刹车态瞬间因为噪声直接判定刹车完成
                 if ((Math.signum(filteredVel) != currentDirection || Math.abs(filteredVel) < 2.0) && timer.milliseconds() > 150
                         || timer.milliseconds() > 3000) {
                     Turret.setPower(0);
@@ -345,7 +324,6 @@ public class TurretFullAutoTuner extends OpMode {
                 }
                 break;
 
-            // ================== 结算阶段 ==================
             case CALCULATE:
                 avgTestVoltage = voltageSamples > 0 ? (sumVoltage / voltageSamples) : getBatteryVoltage();
 
@@ -380,7 +358,6 @@ public class TurretFullAutoTuner extends OpMode {
                 break;
         }
 
-        // 实时面板更新
         if (state != State.DONE) {
             telemetry.addData("Phase", state.toString().split("_")[0]);
             telemetry.addData("State", state.toString());
@@ -395,7 +372,6 @@ public class TurretFullAutoTuner extends OpMode {
         telemetry.update();
     }
 
-    // 【关键修复3】将 PB_BRAKE 加入到返回态判定中，允许其在刹车时小幅越过绝对安全线不被强制切断
     private boolean isReturningState(State s) {
         return s == State.KS_RETURN || s == State.KV_RETURN || s == State.KA_RETURN || s == State.PB_RETURN || s == State.PB_BRAKE;
     }

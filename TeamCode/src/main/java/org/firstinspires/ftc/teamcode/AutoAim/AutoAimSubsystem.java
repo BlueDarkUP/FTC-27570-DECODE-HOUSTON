@@ -22,31 +22,22 @@ public class AutoAimSubsystem {
 
     public static double TURRET_kP = 30.0;
     public static double TURRET_kI = 0.0;
-    public static double TURRET_kD = 0.;
+    public static double TURRET_kD = 0.0;
     public static double TURRET_kF = 0.0001;
-
     public static double TURRET_kV = 0.001112;
-
-    public static double TURRET_kS = 0.232351;
-
+    public static double TURRET_kS = 0.03;
     public static double TURRET_kA = 0.000097;
-
     public static double TURRET_LATENCY = 0.01;
-
     public static double TURRET_DEADZONE_DEG = 0.8;
     public static double TURRET_MAX_POWER = 1.0;
-
     public static double TURRET_FILTER_ALPHA = 0.7;
     public static double TURRET_VEL_FILTER_ALPHA = 0.9;
-
     public static double TURRET_kLinearBraking = 0.007020;
     public static double TURRET_kQuadraticFriction = 0.000104;
-
     public static double TUNING_VOLTAGE = 12.52;
 
     private PIDFController turretPIDF;
     private final double TICKS_PER_REV = 32768.0;
-
     private final double LP_UP = 1.0;
     private final double LP_DOWN = 0.4;
     private final double RP_UP = 0.0;
@@ -54,12 +45,10 @@ public class AutoAimSubsystem {
 
     private double filteredTurretRelAngle = 0.0;
     private boolean isFilterInitialized = false;
-
     private double lastTurretRelAngle = 0.0;
     private double filteredTurretVel = 0.0;
     private double lastTargetVel = 0.0;
     private long lastTime = 0;
-
     private long lastVoltageReadTime = 0;
     private double currentBatteryVoltage = 12.0;
 
@@ -129,9 +118,11 @@ public class AutoAimSubsystem {
             double manualPitch = AimCalculator.interpolate(manualDist, 2);
             aimResult = new AimCalculator.AimResult(manualDist, currentHeadingDeg, manualRpm, manualPitch, 0.0);
         } else {
-            aimResult = AimCalculator.solveAim(
-                    robotX, robotY, globalVx, globalVy, 0, 0, targetX, targetY
-            );
+            double totalTime = AimCalculator.CONSTANT_FLIGHT_TIME + AimCalculator.MECHANICAL_SHOOT_DELAY;
+            double futureX = robotX + (globalVx * totalTime);
+            double futureY = robotY + (globalVy * totalTime);
+
+            aimResult = AimCalculator.solveAim(futureX, futureY, targetX, targetY);
         }
 
         if (aimResult != null) {

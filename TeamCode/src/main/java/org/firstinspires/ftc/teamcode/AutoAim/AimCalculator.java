@@ -5,51 +5,45 @@ import com.acmerobotics.dashboard.config.Config;
 @Config
 public class AimCalculator {
     public static double MECHANICAL_SHOOT_DELAY = 0.1;
+    public static double CONSTANT_FLIGHT_TIME = 0.85;
 
     public static double P1_DIST = 21.0;
     public static double P1_RPM = 2800;
     public static double P1_PITCH = 0.35;
-    public static double P1_TIME = 0.4;
 
     public static double P2_DIST = 60.0;
     public static double P2_RPM = 3150;
     public static double P2_PITCH = 0.70;
-    public static double P2_TIME = 0.55;
 
     public static double P3_DIST = 67.1;
     public static double P3_RPM = 3200;
     public static double P3_PITCH = 0.78;
-    public static double P3_TIME = 0.65;
 
     public static double P4_DIST = 89.2;
     public static double P4_RPM = 3750;
     public static double P4_PITCH = 1.0;
-    public static double P4_TIME = 0.75;
 
     public static double P5_DIST = 104.6;
     public static double P5_RPM = 3750;
     public static double P5_PITCH = 1.0;
-    public static double P5_TIME = 0.8;
 
     public static double P6_DIST = 122.3;
     public static double P6_RPM = 4250;
     public static double P6_PITCH = 1.0;
-    public static double P6_TIME = 0.8;
 
     public static double P7_DIST = 150.0;
     public static double P7_RPM = 4900;
     public static double P7_PITCH = 1.0;
-    public static double P7_TIME = 0.9;
 
     private static double[][] getShootData() {
         return new double[][] {
-                {P1_DIST, P1_RPM, P1_PITCH, P1_TIME},
-                {P2_DIST, P2_RPM, P2_PITCH, P2_TIME},
-                {P3_DIST, P3_RPM, P3_PITCH, P3_TIME},
-                {P4_DIST, P4_RPM, P4_PITCH, P4_TIME},
-                {P5_DIST, P5_RPM, P5_PITCH, P5_TIME},
-                {P6_DIST, P6_RPM, P6_PITCH, P6_TIME},
-                {P7_DIST, P7_RPM, P7_PITCH, P7_TIME}
+                {P1_DIST, P1_RPM, P1_PITCH},
+                {P2_DIST, P2_RPM, P2_PITCH},
+                {P3_DIST, P3_RPM, P3_PITCH},
+                {P4_DIST, P4_RPM, P4_PITCH},
+                {P5_DIST, P5_RPM, P5_PITCH},
+                {P6_DIST, P6_RPM, P6_PITCH},
+                {P7_DIST, P7_RPM, P7_PITCH}
         };
     }
 
@@ -72,55 +66,19 @@ public class AimCalculator {
         return currentData[0][col];
     }
 
-    /**
-     * @param rx 当前机器人X坐标 (Pinpoint全局X，正前方)
-     * @param ry 当前机器人Y坐标 (Pinpoint全局Y，正左方)
-     * @param vx 机器人全局X轴速度
-     * @param vy 机器人全局Y轴速度
-     * @param ax 机器人全局X轴加速度
-     * @param ay 机器人全局Y轴加速度
-     * @param tx 目标X坐标 (在Pinpoint全局坐标系下)
-     * @param ty 目标Y坐标 (在Pinpoint全局坐标系下)
-     */
-    public static AimResult solveAim(double rx, double ry, double vx, double vy, double ax, double ay, double tx, double ty) {
-        double dx = tx - rx;
-        double dy = ty - ry;
-        double dist = Math.hypot(dx, dy);
+    public static AimResult solveAim(double futureRx, double futureRy, double tx, double ty) {
+        double dx = tx - futureRx;
+        double dy = ty - futureRy;
+        double vDist = Math.hypot(dx, dy);
 
-        if (dist < 0.1) return null;
-
-        double tf = interpolate(dist, 3);
-        double vDist = dist;
-
-        for (int i = 0; i < 2; i++) {
-            double totalTime = tf + MECHANICAL_SHOOT_DELAY;
-
-            // 预测底盘在子弹飞行期间的全局位移
-            double chassisDisplacementX = (vx * totalTime) + (0.5 * ax * totalTime * totalTime);
-            double chassisDisplacementY = (vy * totalTime) + (0.5 * ay * totalTime * totalTime);
-
-            double predictedX = tx - rx - chassisDisplacementX;
-            double predictedY = ty - ry - chassisDisplacementY;
-
-            vDist = Math.hypot(predictedX, predictedY);
-            tf = interpolate(vDist, 3);
-        }
-
-        double finalTotalTime = tf + MECHANICAL_SHOOT_DELAY;
-        double finalChassisDispX = (vx * finalTotalTime) + (0.5 * ax * finalTotalTime * finalTotalTime);
-        double finalChassisDispY = (vy * finalTotalTime) + (0.5 * ay * finalTotalTime * finalTotalTime);
-
-        // 考虑到提前量的最终目标向量
-        double finalDX = dx - finalChassisDispX;
-        double finalDY = dy - finalChassisDispY;
+        if (vDist < 0.1) return null;
 
         return new AimResult(
                 vDist,
-                // 由于Pinpoint的X是前方，Y是左方，atan2(Y, X) 完美对应: 前方0度，左方90度，右方-90度
-                Math.toDegrees(Math.atan2(finalDY, finalDX)),
+                Math.toDegrees(Math.atan2(dy, dx)),
                 interpolate(vDist, 1),
                 interpolate(vDist, 2),
-                tf
+                CONSTANT_FLIGHT_TIME
         );
     }
 
