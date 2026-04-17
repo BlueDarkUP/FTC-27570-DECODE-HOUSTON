@@ -9,6 +9,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 @Config
 public class AutoAimSubsystem {
@@ -16,41 +17,36 @@ public class AutoAimSubsystem {
     private DcMotorEx Turret;
     private Servo LP;
     private Servo RP;
+    private VoltageSensor battery;
+    private HardwareMap hardwareMap;
 
-    // 基础 PIDF
     public static double TURRET_kP = 55.0;
     public static double TURRET_kI = 0.0;
     public static double TURRET_kD = 0.3;
     public static double TURRET_kF = 0.0001;
 
-    //角速度前馈
-    public static double TURRET_kV = 0.001;
+    public static double TURRET_kV = 0.001061;
 
-    //克服静摩擦
-    public static double TURRET_kS = 0.1;
+    public static double TURRET_kS = 0.114514;
 
-    //加速度前馈
-    public static double TURRET_kA = 0.0001;
+    public static double TURRET_kA = 0.000099;
 
-    //目标前馈（预测目标一段时间之后的位置且瞄准
     public static double TURRET_LATENCY = 0.01;
 
-    // 死区与最大功率
     public static double TURRET_DEADZONE_DEG = 0.8;
     public static double TURRET_MAX_POWER = 1.0;
 
-    // 滤波器系数
     public static double TURRET_FILTER_ALPHA = 0.7;
     public static double TURRET_VEL_FILTER_ALPHA = 0.9;
 
-    // 预测刹车
-    public static double TURRET_kLinearBraking = 0.01765;
-    public static double TURRET_kQuadraticFriction = 0.000086;
+    public static double TURRET_kLinearBraking = 0.018429;
+    public static double TURRET_kQuadraticFriction = 0.000117;
+
+    public static double TUNING_VOLTAGE = 13.61;
 
     private PIDFController turretPIDF;
-    private final double TICKS_PER_REV = 32798.0;  //云台转一圈的编码器tick数
+    private final double TICKS_PER_REV = 32798.0;
 
-    // 俯仰角伺服参数
     private final double LP_UP = 1.0;
     private final double LP_DOWN = 0.4;
     private final double RP_UP = 0.0;
@@ -64,6 +60,9 @@ public class AutoAimSubsystem {
     private double lastTargetVel = 0.0;
     private long lastTime = 0;
 
+    private long lastVoltageReadTime = 0;
+    private double currentBatteryVoltage = 12.0;
+
     public static class TurretCommand {
         public boolean hasTarget = false;
         public double targetRpm = 0.0;
@@ -75,6 +74,8 @@ public class AutoAimSubsystem {
     }
 
     public AutoAimSubsystem(HardwareMap hardwareMap) {
+        this.hardwareMap = hardwareMap;
+
         Turret = hardwareMap.get(DcMotorEx.class, "Turret");
         Turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         Turret.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
@@ -83,9 +84,23 @@ public class AutoAimSubsystem {
         LP = hardwareMap.get(Servo.class, "LP");
         RP = hardwareMap.get(Servo.class, "RP");
 
+        battery = hardwareMap.voltageSensor.iterator().next();
+        currentBatteryVoltage = getBatteryVoltage();
+
         turretPIDF = new PIDFController(TURRET_kP, TURRET_kI, TURRET_kD, TURRET_kF);
 
         setPitchServos(0.7);
+    }
+
+    private double getBatteryVoltage() {
+        double maxVoltage = 0;
+        for (VoltageSensor sensor : this.hardwareMap.voltageSensor) {
+            double v = sensor.getVoltage();
+            if (v > maxVoltage) {
+                maxVoltage = v;
+            }
+        }
+        return Math.max(8.0, maxVoltage > 0 ? maxVoltage : TUNING_VOLTAGE);
     }
 
     private void setPitchServos(double targetPitch) {
@@ -131,6 +146,11 @@ public class AutoAimSubsystem {
             long currentTime = System.nanoTime();
             double dt = (lastTime == 0) ? 0 : (currentTime - lastTime) / 1e9;
             lastTime = currentTime;
+
+            if (currentTime - lastVoltageReadTime > 250_000_000L) {
+                currentBatteryVoltage = getBatteryVoltage();
+                lastVoltageReadTime = currentTime;
+            }
 
             double currentTurretTicks = Turret.getCurrentPosition();
             double rawTurretRelAngle = (currentTurretTicks / TICKS_PER_REV) * 360.0;
@@ -209,6 +229,9 @@ public class AutoAimSubsystem {
                 turretPower = (targetAccel * TURRET_kA)
                         + (finalTargetVel * TURRET_kV)
                         + (Math.signum(finalTargetVel) * TURRET_kS);
+
+                double voltageCompensationRatio = TUNING_VOLTAGE / currentBatteryVoltage;
+                turretPower *= voltageCompensationRatio;
             }
 
             turretPower = Math.max(-TURRET_MAX_POWER, Math.min(TURRET_MAX_POWER, turretPower));
@@ -222,6 +245,8 @@ public class AutoAimSubsystem {
             packet.put("Turret/TargetDist", command.targetDist);
             packet.put("Turret/TargetVel", finalTargetVel);
             packet.put("Turret/IsUnwinding", command.isUnwinding);
+            packet.put("Turret/LiveVoltage", currentBatteryVoltage);
+            packet.put("Turret/VoltCompRatio", TUNING_VOLTAGE / currentBatteryVoltage);
 
             FtcDashboard.getInstance().sendTelemetryPacket(packet);
 
@@ -232,7 +257,6 @@ public class AutoAimSubsystem {
 
         return command;
     }
-
 
     public void stop() {
         Turret.setPower(0);

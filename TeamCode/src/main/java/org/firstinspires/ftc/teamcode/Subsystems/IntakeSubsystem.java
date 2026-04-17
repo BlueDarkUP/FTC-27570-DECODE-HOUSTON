@@ -84,7 +84,7 @@ public class IntakeSubsystem {
                         motorIntake.setPower(1.0);
                         systemStatusMessage = "⚡ 动态射击中 (近距离 1.0 满力)!";
                     } else {
-                        motorIntake.setPower(0.75);
+                        motorIntake.setPower(1);
                         systemStatusMessage = "⚡ 动态射击中 (远距离 0.75 降速)!";
                     }
                 } else {
