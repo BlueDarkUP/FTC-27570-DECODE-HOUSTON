@@ -17,7 +17,7 @@ import java.util.List;
 public class TurretPredictiveBrakingTuner extends OpMode {
 
     private DcMotorEx Turret;
-    private final double TICKS_PER_REV = 32798.0;
+    private final double TICKS_PER_REV = 32798.0; //TODO: 云台绕一圈编码器读数
 
     public static double[] TEST_POWERS = {1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3};
 

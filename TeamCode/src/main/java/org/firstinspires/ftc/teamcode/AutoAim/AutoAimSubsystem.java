@@ -52,8 +52,6 @@ public class AutoAimSubsystem {
     private final double RP_UP = 0.0;
     private final double RP_DOWN = 0.5;
 
-    private final double AIM_LOCK_TOLERANCE_DEG = 1.0;
-
     // 状态存储变量
     private double filteredTurretRelAngle = 0.0;
     private boolean isFilterInitialized = false;
@@ -69,6 +67,7 @@ public class AutoAimSubsystem {
         public double targetPitch = 0.0;
         public boolean isAimLocked = false;
         public boolean isUnwinding = false;
+        public double currentTolerance = 1.0; // 新增：用于 TeleOp 显示当前的容错阈值
     }
 
     public AutoAimSubsystem(HardwareMap hardwareMap) {
@@ -121,6 +120,12 @@ public class AutoAimSubsystem {
             command.targetRpm = aimResult.rpm;
             command.targetPitch = aimResult.pitch;
 
+            // --- 线性变化容错计算 (20in -> 5deg, 150in -> 1deg) ---
+            // 公式：y = y1 + (y2 - y1) / (x2 - x1) * (x - x1)
+            double calculatedTolerance = 5.0 + (1.0 - 5.0) / (150.0 - 20.0) * (aimResult.dist - 20.0);
+            // 限制范围在 1.0 到 5.0 之间
+            command.currentTolerance = Math.max(1.0, Math.min(5.0, calculatedTolerance));
+
             // --- 1. 时间、角度读取与低通滤波 ---
             long currentTime = System.nanoTime();
             double dt = (lastTime == 0) ? 0 : (currentTime - lastTime) / 1e9;
@@ -157,8 +162,6 @@ public class AutoAimSubsystem {
             }
 
             // --- 3. 延迟补偿逻辑 (Latency Compensation) ---
-            // 补偿原理：既然系统有延迟，我们就预测目标在延迟时间后的角度
-            // 目标未来角度 = 当前解算的绝对角度 + 目标的角速度 * 延迟时间
             double compensatedTargetAbsAngle = aimResult.algYaw + (translationalOmegaDeg * TURRET_LATENCY);
 
             // --- 4. 误差计算与 Unwind 逻辑 ---
@@ -180,7 +183,8 @@ public class AutoAimSubsystem {
                 command.isUnwinding = false;
             }
 
-            command.isAimLocked = Math.abs(error) <= AIM_LOCK_TOLERANCE_DEG;
+            // 使用计算出的动态容错阈值进行判定
+            command.isAimLocked = Math.abs(error) <= command.currentTolerance;
 
             // --- 5. 预测刹车 (仅在 Unwinding 时启用) ---
             double brakingDist = 0.0;
@@ -192,16 +196,10 @@ public class AutoAimSubsystem {
             }
 
             // --- 6. 动力融合 (PID + kV + kA + kS) ---
-            // PID 基于预测位置（Unwind）或实际滤波位置（平时）
             double pidOutputVel = turretPIDF.calculate(predictedRelAngle, targetTurretRelAngle);
-
-            // 前馈速度：抵消底盘自转 + 补偿目标相对运动
             double feedforwardVel = -robotAngularVelocityDeg + translationalOmegaDeg;
-
-            // 总目标速度
             double finalTargetVel = pidOutputVel + feedforwardVel;
 
-            // 加速度前馈计算
             double targetAccel = 0.0;
             if (dt > 0.0001) {
                 targetAccel = (finalTargetVel - lastTargetVel) / dt;
@@ -214,7 +212,6 @@ public class AutoAimSubsystem {
                 turretPIDF.reset();
                 lastTargetVel = 0.0;
             } else {
-                // 核心动力方程：kA * 加速度 + kV * 速度 + kS * 静态摩擦
                 turretPower = (targetAccel * TURRET_kA)
                         + (finalTargetVel * TURRET_kV)
                         + (Math.signum(finalTargetVel) * TURRET_kS);
@@ -230,10 +227,9 @@ public class AutoAimSubsystem {
             drawAnalysis(packet.fieldOverlay(), robotX, robotY, currentHeadingDeg, filteredTurretRelAngle, aimResult.algYaw, targetX, targetY);
 
             packet.put("Turret/Error", error);
+            packet.put("Turret/CurrentTolerance", command.currentTolerance); // 方便在 Dashboard 观察当前容错
             packet.put("Turret/TargetVel", finalTargetVel);
-            packet.put("Turret/TargetAccelFF", targetAccel * TURRET_kA);
             packet.put("Turret/IsUnwinding", command.isUnwinding);
-            packet.put("Turret/LatencyCompDeg", translationalOmegaDeg * TURRET_LATENCY);
 
             FtcDashboard.getInstance().sendTelemetryPacket(packet);
 

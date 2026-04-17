@@ -176,7 +176,9 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             flywheelSubsystem.update(targetVelocityRPM, isEmergencyBrake, isActiveSpooling);
             boolean rpmOK = flywheelSubsystem.isReady();
 
-            intakeSubsystem.update(isShootingMode, aimCommand.hasTarget, aimCommand.isUnwinding, aimCommand.isAimLocked, rpmOK);
+            boolean effectiveAimLocked = isManualMode ? true : aimCommand.isAimLocked;
+
+            intakeSubsystem.update(isShootingMode, aimCommand.hasTarget, aimCommand.isUnwinding, effectiveAimLocked, rpmOK);
 
             telemetry.addData("操作模式", isManualMode ? "🛠️ [手动控制档] (屏蔽动态预测)" : "🤖 [自动自瞄档]");
             telemetry.addData("当前动作", isShootingMode ? "[ 发射模式 ]" : "[ 怠速/收集模式 ]");
@@ -186,7 +188,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
             telemetry.addLine("--- 发射系统状态 ---");
             if (aimCommand.hasTarget) {
-                telemetry.addData("云台锁定", aimCommand.isAimLocked ? "✅ LOCKED" : "⏳ 追踪中");
+                telemetry.addData("云台锁定", effectiveAimLocked ? "✅ LOCKED" : "⏳ 追踪中");
                 telemetry.addData("计算 Pitch", "%.3f", aimCommand.targetPitch);
             }
             telemetry.addData("推弹机构", isShootingMode ? "发射推弹态 (0.18)" : "归位态 (0.0)");
