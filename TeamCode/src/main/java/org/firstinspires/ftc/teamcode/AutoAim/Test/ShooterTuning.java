@@ -21,8 +21,8 @@ public class ShooterTuning extends LinearOpMode {
     public static double D = 0.000;
 
     // 前馈与物理模型参数
-    public static double kV = 0.0003;
-    public static double kS = 0.0991;
+    public static double kV = 0.00033290;
+    public static double kS = 0.097208;
 
     // 新增：不对称限幅参数，限制最大反转（刹车）功率，保护同步带和齿轮箱
     // 默认设置为 -0.25 (即允许最多 25% 的反向拉力)

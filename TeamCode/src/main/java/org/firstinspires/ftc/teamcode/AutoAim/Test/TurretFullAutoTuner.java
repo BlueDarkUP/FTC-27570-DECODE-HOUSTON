@@ -19,7 +19,7 @@ public class TurretFullAutoTuner extends OpMode {
 
     private DcMotorEx Turret;
 
-    public static double TICKS_PER_REV = 32798.0; //TODO: 确认实际云台绕一圈编码器读数
+    public static double TICKS_PER_REV = 32768.0; //TODO: 确认实际云台绕一圈编码器读数
 
     // =====================================
     // 调试器安全与逻辑参数

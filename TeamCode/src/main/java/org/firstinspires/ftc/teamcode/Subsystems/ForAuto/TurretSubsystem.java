@@ -22,7 +22,7 @@ public class TurretSubsystem {
     private final double MAX_INTEGRAL_POWER = 0.08;
 
     private final double ERROR_TOLERANCE = 1.5;
-    private final double TURRET_TICKS_PER_REV = 32798;
+    private final double TURRET_TICKS_PER_REV = 32768;
     private final double TICKS_PER_DEGREE = TURRET_TICKS_PER_REV / 360.0;
 
     private double integralSum = 0;

@@ -20,16 +20,16 @@ public class AutoAimSubsystem {
     private VoltageSensor battery;
     private HardwareMap hardwareMap;
 
-    public static double TURRET_kP = 55.0;
+    public static double TURRET_kP = 30.0;
     public static double TURRET_kI = 0.0;
-    public static double TURRET_kD = 0.3;
+    public static double TURRET_kD = 0.;
     public static double TURRET_kF = 0.0001;
 
-    public static double TURRET_kV = 0.001061;
+    public static double TURRET_kV = 0.001112;
 
-    public static double TURRET_kS = 0.114514;
+    public static double TURRET_kS = 0.232351;
 
-    public static double TURRET_kA = 0.000099;
+    public static double TURRET_kA = 0.000097;
 
     public static double TURRET_LATENCY = 0.01;
 
@@ -39,13 +39,13 @@ public class AutoAimSubsystem {
     public static double TURRET_FILTER_ALPHA = 0.7;
     public static double TURRET_VEL_FILTER_ALPHA = 0.9;
 
-    public static double TURRET_kLinearBraking = 0.018429;
-    public static double TURRET_kQuadraticFriction = 0.000117;
+    public static double TURRET_kLinearBraking = 0.007020;
+    public static double TURRET_kQuadraticFriction = 0.000104;
 
-    public static double TUNING_VOLTAGE = 13.61;
+    public static double TUNING_VOLTAGE = 12.52;
 
     private PIDFController turretPIDF;
-    private final double TICKS_PER_REV = 32798.0;
+    private final double TICKS_PER_REV = 32768.0;
 
     private final double LP_UP = 1.0;
     private final double LP_DOWN = 0.4;
