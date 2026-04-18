@@ -22,11 +22,11 @@ public class FlywheelSubsystem {
     private final double SPOOL_UP_TOLERANCE = 50.0;
 
     // PIDF 参数
-    public static double kP = 0.025;
+    public static double kP = 0.0015;
     public static double kI = 0.000;
     public static double kD = 0.000;
-    public static double kV = 0.0002;
-    public static double kS = 0.03;
+    public static double kV = 0.0003;
+    public static double kS = 0.07;
 
     private final double TICKS_PER_REV = 28.0;
 
@@ -116,7 +116,7 @@ public class FlywheelSubsystem {
         double pid = (kP * errorTPS) + (kI * integralSum) + (kD * derivative);
 
         double basePower = feedforward + pid;
-        double power = basePower * (12.9 / currentVoltage);
+        double power = basePower * (13.105 / currentVoltage);
 
         if (isEmergencyBrake || targetVelocityRPM <= 0) {
             power = 0;

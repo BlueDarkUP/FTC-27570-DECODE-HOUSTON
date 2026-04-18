@@ -20,24 +20,23 @@ public class AutoAimSubsystem {
     private VoltageSensor battery;
     private HardwareMap hardwareMap;
 
-    public static double TURRET_kP = 30.0;
+    public static double TURRET_kP = 33.0;
     public static double TURRET_kI = 0.0;
     public static double TURRET_kD = 0.0;
     public static double TURRET_kF = 0.0001;
-    public static double TURRET_kV = 0.001474;
+    public static double TURRET_kV = 0.001201;
     public static double TURRET_kS = 0.03;
-    public static double TURRET_kA = 0.000093;
+    public static double TURRET_kA = 0.000113;
     public static double TURRET_LATENCY = 0.01;
-    public static double TURRET_DEADZONE_DEG = 0.8;
     public static double TURRET_MAX_POWER = 1.0;
     public static double TURRET_FILTER_ALPHA = 0.7;
     public static double TURRET_VEL_FILTER_ALPHA = 0.9;
-    public static double TURRET_kLinearBraking = 0.016177;
-    public static double TURRET_kQuadraticFriction = 0.000101;
-    public static double TUNING_VOLTAGE = 12.50;
+    public static double TURRET_kLinearBraking = 0.008500;
+    public static double TURRET_kQuadraticFriction = 0.000098;
+    public static double TUNING_VOLTAGE = 13.04;
 
     private PIDFController turretPIDF;
-    private final double TICKS_PER_REV = 32820.0;
+    private final double TICKS_PER_REV = 31087.589;
     private final double LP_UP = 1.0;
     private final double LP_DOWN = 0.4;
     private final double RP_UP = 0.0;
@@ -64,20 +63,15 @@ public class AutoAimSubsystem {
 
     public AutoAimSubsystem(HardwareMap hardwareMap) {
         this.hardwareMap = hardwareMap;
-
         Turret = hardwareMap.get(DcMotorEx.class, "Turret");
         Turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         Turret.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         Turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-
         LP = hardwareMap.get(Servo.class, "LP");
         RP = hardwareMap.get(Servo.class, "RP");
-
         battery = hardwareMap.voltageSensor.iterator().next();
         currentBatteryVoltage = getBatteryVoltage();
-
         turretPIDF = new PIDFController(TURRET_kP, TURRET_kI, TURRET_kD, TURRET_kF);
-
         setPitchServos(0.7);
     }
 
@@ -85,9 +79,7 @@ public class AutoAimSubsystem {
         double maxVoltage = 0;
         for (VoltageSensor sensor : this.hardwareMap.voltageSensor) {
             double v = sensor.getVoltage();
-            if (v > maxVoltage) {
-                maxVoltage = v;
-            }
+            if (v > maxVoltage) maxVoltage = v;
         }
         return Math.max(8.0, maxVoltage > 0 ? maxVoltage : TUNING_VOLTAGE);
     }
@@ -97,7 +89,6 @@ public class AutoAimSubsystem {
         double proportion = (clampedLP - LP_DOWN) / (LP_UP - LP_DOWN);
         double calculatedRP = RP_DOWN + proportion * (RP_UP - RP_DOWN);
         calculatedRP = Math.max(0.0, Math.min(1.0, calculatedRP));
-
         LP.setPosition(clampedLP);
         RP.setPosition(calculatedRP);
     }
@@ -109,7 +100,6 @@ public class AutoAimSubsystem {
             boolean isManualMode, double manualDist) {
 
         turretPIDF.setPIDF(TURRET_kP, TURRET_kI, TURRET_kD, TURRET_kF);
-
         TurretCommand command = new TurretCommand();
         AimCalculator.AimResult aimResult;
 
@@ -121,7 +111,6 @@ public class AutoAimSubsystem {
             double totalTime = AimCalculator.CONSTANT_FLIGHT_TIME + AimCalculator.MECHANICAL_SHOOT_DELAY;
             double futureX = robotX + (globalVx * totalTime);
             double futureY = robotY + (globalVy * totalTime);
-
             aimResult = AimCalculator.solveAim(futureX, futureY, targetX, targetY);
         }
 
@@ -165,14 +154,12 @@ public class AutoAimSubsystem {
             double dy = targetY - robotY;
             double distSq = dx * dx + dy * dy;
             double translationalOmegaDeg = 0.0;
-
             if (distSq > 0.001) {
                 double omegaRad = (-dx * globalVy + dy * globalVx) / distSq;
                 translationalOmegaDeg = Math.toDegrees(omegaRad);
             }
 
             double compensatedTargetAbsAngle = aimResult.algYaw + (translationalOmegaDeg * TURRET_LATENCY);
-
             double currentTurretAbsAngle = currentHeadingDeg + filteredTurretRelAngle;
             double error = compensatedTargetAbsAngle - currentTurretAbsAngle;
 
@@ -206,25 +193,15 @@ public class AutoAimSubsystem {
             double finalTargetVel = pidOutputVel + feedforwardVel;
 
             double targetAccel = 0.0;
-            if (dt > 0.0001) {
-                targetAccel = (finalTargetVel - lastTargetVel) / dt;
-            }
+            if (dt > 0.0001) targetAccel = (finalTargetVel - lastTargetVel) / dt;
             lastTargetVel = finalTargetVel;
 
-            double turretPower;
-            if (Math.abs(error) < TURRET_DEADZONE_DEG && Math.abs(robotAngularVelocityDeg) < 3.0 && Math.abs(translationalOmegaDeg) < 5.0) {
-                turretPower = 0.0;
-                turretPIDF.reset();
-                lastTargetVel = 0.0;
-            } else {
-                turretPower = (targetAccel * TURRET_kA)
-                        + (finalTargetVel * TURRET_kV)
-                        + (Math.signum(finalTargetVel) * TURRET_kS);
+            double turretPower = (targetAccel * TURRET_kA)
+                    + (finalTargetVel * TURRET_kV)
+                    + (Math.signum(finalTargetVel) * TURRET_kS);
 
-                double voltageCompensationRatio = TUNING_VOLTAGE / currentBatteryVoltage;
-                turretPower *= voltageCompensationRatio;
-            }
-
+            double voltageCompensationRatio = TUNING_VOLTAGE / currentBatteryVoltage;
+            turretPower *= voltageCompensationRatio;
             turretPower = Math.max(-TURRET_MAX_POWER, Math.min(TURRET_MAX_POWER, turretPower));
 
             Turret.setPower(turretPower);
@@ -232,20 +209,13 @@ public class AutoAimSubsystem {
 
             TelemetryPacket packet = new TelemetryPacket();
             packet.put("Turret/Error", error);
-            packet.put("Turret/CurrentTolerance", command.currentTolerance);
-            packet.put("Turret/TargetDist", command.targetDist);
-            packet.put("Turret/TargetVel", finalTargetVel);
-            packet.put("Turret/IsUnwinding", command.isUnwinding);
-            packet.put("Turret/LiveVoltage", currentBatteryVoltage);
-            packet.put("Turret/VoltCompRatio", TUNING_VOLTAGE / currentBatteryVoltage);
-
+            packet.put("Turret/IsLocked", command.isAimLocked);
             FtcDashboard.getInstance().sendTelemetryPacket(packet);
 
         } else {
             Turret.setPower(0);
             isFilterInitialized = false;
         }
-
         return command;
     }
 
