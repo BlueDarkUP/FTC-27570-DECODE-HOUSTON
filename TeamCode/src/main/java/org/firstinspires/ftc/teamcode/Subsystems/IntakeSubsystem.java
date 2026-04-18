@@ -84,7 +84,7 @@ public class IntakeSubsystem {
                         motorIntake.setPower(1.0);
                         systemStatusMessage = "⚡ 动态射击中 (近距离 1.0 满力)!";
                     } else {
-                        motorIntake.setPower(1);
+                        motorIntake.setPower(0.8);
                         systemStatusMessage = "⚡ 动态射击中 (远距离 0.75 降速)!";
                     }
                 } else {
@@ -117,7 +117,7 @@ public class IntakeSubsystem {
                 isStalling = false;
             } else {
                 motorIntake.setPower(1.0);
-                systemStatusMessage = "怠速中 (Intake 常转收件 最大速度 0.8)";
+                systemStatusMessage = "怠速中";
             }
         }
 

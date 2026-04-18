@@ -26,7 +26,7 @@ public class ShooterTuning extends LinearOpMode {
 
     // 新增：不对称限幅参数，限制最大反转（刹车）功率，保护同步带和齿轮箱
     // 默认设置为 -0.25 (即允许最多 25% 的反向拉力)
-    public static double MAX_BRAKE_POWER = -0.25;
+    public static double MAX_BRAKE_POWER = 0;
 
     public static double TICKS_PER_REV = 28.0;
 

@@ -13,10 +13,7 @@ public class FlywheelSubsystem {
     private DcMotorEx motorHS;
     private VoltageSensor batteryVoltageSensor;
 
-    // 常量定义
     public static final double IDLE_VELOCITY_MIN = 3000.0;
-    public static final double PRE_SPOOL_MAX = 4100.0;
-    public static final double SHOOT_MAX = 4900.0;
 
     private final double RPM_LOWER_BOUND = 4250.0;
     private final double RPM_UPPER_BOUND = 4850.0;
@@ -53,9 +50,8 @@ public class FlywheelSubsystem {
         motorSH.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         motorHS.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
-        // BRAKE 模式，在 power 为 0 时提供更强的阻尼，配合反转电流更快减速
-        motorSH.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        motorHS.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        motorSH.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+        motorHS.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
     }
 
     public void start() {
@@ -65,7 +61,6 @@ public class FlywheelSubsystem {
     }
 
     public void update(double targetVelocityRPM, boolean isEmergencyBrake, boolean isActiveSpooling) {
-        // 动态容差计算
         double dynamicTolerance;
         if (targetVelocityRPM <= RPM_LOWER_BOUND) {
             dynamicTolerance = MAX_TOLERANCE;
@@ -80,7 +75,6 @@ public class FlywheelSubsystem {
         double targetVelTPS = (targetVelocityRPM * TICKS_PER_REV) / 60.0;
         currentRPM = (currentVelTPS * 60.0) / TICKS_PER_REV;
 
-        // 就绪状态逻辑
         if (!isActiveSpooling) {
             isFlywheelReady = false;
         } else {
@@ -114,7 +108,6 @@ public class FlywheelSubsystem {
 
         double currentVoltage = batteryVoltageSensor.getVoltage();
 
-        // Feedforward：只在目标大于0时施加，防止在静止时抖动
         double feedforward = 0.0;
         if (targetVelTPS > 0) {
             feedforward = kS * Math.signum(targetVelTPS) + kV * targetVelTPS;
@@ -122,17 +115,14 @@ public class FlywheelSubsystem {
 
         double pid = (kP * errorTPS) + (kI * integralSum) + (kD * derivative);
 
-        // 基础功率计算与电压补偿
         double basePower = feedforward + pid;
         double power = basePower * (12.9 / currentVoltage);
 
-        // 停机处理
-        if (targetVelocityRPM <= 0 || isEmergencyBrake) {
+        if (isEmergencyBrake || targetVelocityRPM <= 0) {
             power = 0;
             integralSum = 0;
         }
 
-        // 限制在 -1.0 到 1.0 之间，允许负数产生反转电流快速减速
         power = Math.max(-1.0, Math.min(1.0, power));
 
         motorSH.setPower(power);

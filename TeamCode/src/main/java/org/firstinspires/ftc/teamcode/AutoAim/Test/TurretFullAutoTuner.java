@@ -19,8 +19,7 @@ public class TurretFullAutoTuner extends OpMode {
 
     private DcMotorEx Turret;
 
-    public static double TICKS_PER_REV = 32768.0; //TODO: 确认实际云台绕一圈编码器读数
-
+    public static double TICKS_PER_REV = 32820.0; //TODO: 确认实际云台绕一圈编码器读数
     public static double MAX_SAFE_ANGLE = 150.0;
     public static double BRAKE_BUFFER_ANGLE = 35.0;
     public static double RETURN_POWER = 0.3;
