@@ -11,11 +11,10 @@ public class IntakeSubsystem {
 
     private DcMotorEx motorIntake;
 
-    // 堵转保护常量
     private final double STALL_CURRENT_AMPS = 2.45;
     private final double STALL_COOLDOWN_SEC = 0.5;
     private final double STALL_TIME_THRESHOLD_SEC = 0.3;
-    private final double CURRENT_READ_INTERVAL = 0.05; // 50ms 采样一次电流
+    private final double CURRENT_READ_INTERVAL = 0.05;
 
     private double intakeBrakeReleaseTime = 0.0;
     private double stallStartTime = 0.0;
@@ -40,17 +39,15 @@ public class IntakeSubsystem {
         runtime.reset();
     }
 
-    public void update(boolean isShootingMode, boolean hasTarget, boolean isUnwinding, boolean isAimLocked, boolean isFlywheelReady, double targetDist) {
+    public void update(boolean isShootingMode, boolean hasTarget, boolean isUnwinding, boolean isAimLocked, boolean isFlywheelReady, double targetDist, boolean isBBBReady) {
         double currentTime = runtime.seconds();
 
         if (isShootingMode) {
-            // 射击模式下完全跳过电流读取，保证高频响应
             isStalling = false;
             lastMeasuredCurrent = 0.0;
 
             if (hasTarget && isUnwinding) {
                 if (!wasUnwinding) unwindReverseEndTime = currentTime + 0.2;
-
                 if (currentTime < unwindReverseEndTime) {
                     motorIntake.setPower(-0.1);
                     systemStatusMessage = "⚠️ 云台复位: 反转退弹";
@@ -60,18 +57,20 @@ public class IntakeSubsystem {
                 }
                 intakeBrakeReleaseTime = 0.0;
             } else {
-                if (hasTarget && isFlywheelReady && isAimLocked) {
-                    // 恢复并修复远近距离动态给弹速度逻辑
-                    if (targetDist < 110.0) {
+                if (!isBBBReady) {
+                    motorIntake.setPower(0.0);
+                    systemStatusMessage = "⏳ 等待 BBB 展开 (600ms)...";
+                } else if (hasTarget) {
+                    if (targetDist < 130.0) {
                         motorIntake.setPower(1.0);
-                        systemStatusMessage = "⚡ 跑打给弹中 (近战 1.0 满力)!";
+                        systemStatusMessage = "⚡ 跑打强行给弹中 (近战 1.0)!";
                     } else {
-                        motorIntake.setPower(1); // 真正应用降速，稳定远距离出弹
-                        systemStatusMessage = "⚡ 跑打给弹中 (远射 0.75 稳弹)!";
+                        motorIntake.setPower(0.6);
+                        systemStatusMessage = "⚡ 跑打强行给弹中 (远射 0.9)!";
                     }
                 } else {
                     motorIntake.setPower(0.0);
-                    systemStatusMessage = "射击就绪等待中...";
+                    systemStatusMessage = "射击待机 (无目标)...";
                 }
             }
         } else {

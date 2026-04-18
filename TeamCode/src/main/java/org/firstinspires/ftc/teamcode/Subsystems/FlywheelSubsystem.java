@@ -15,18 +15,17 @@ public class FlywheelSubsystem {
 
     public static final double IDLE_VELOCITY_MIN = 3000.0;
 
-    private final double RPM_LOWER_BOUND = 4250.0;
-    private final double RPM_UPPER_BOUND = 4850.0;
-    private final double MAX_TOLERANCE = 1000;
-    private final double MIN_TOLERANCE = 50;
+    private final double DIST_LOWER_BOUND = 20.0;
+    private final double DIST_UPPER_BOUND = 150.0;
+    private final double TOLERANCE_AT_LOWER_DIST = 1000.0;
+    private final double TOLERANCE_AT_UPPER_DIST = 100.0;
     private final double SPOOL_UP_TOLERANCE = 50.0;
 
-    // PIDF 参数
-    public static double kP = 0.0015;
+    public static double kP = 0.007;
     public static double kI = 0.000;
-    public static double kD = 0.000;
-    public static double kV = 0.0003;
-    public static double kS = 0.07;
+    public static double kD = 0.000000;
+    public static double kV = 0.000298;
+    public static double kS = 0.097208;
 
     private final double TICKS_PER_REV = 28.0;
 
@@ -60,15 +59,15 @@ public class FlywheelSubsystem {
         integralSum = 0;
     }
 
-    public void update(double targetVelocityRPM, boolean isEmergencyBrake, boolean isActiveSpooling) {
+    public void update(double targetVelocityRPM, double targetDist, boolean isEmergencyBrake, boolean isActiveSpooling) {
         double dynamicTolerance;
-        if (targetVelocityRPM <= RPM_LOWER_BOUND) {
-            dynamicTolerance = MAX_TOLERANCE;
-        } else if (targetVelocityRPM >= RPM_UPPER_BOUND) {
-            dynamicTolerance = MIN_TOLERANCE;
+        if (targetDist <= DIST_LOWER_BOUND) {
+            dynamicTolerance = TOLERANCE_AT_LOWER_DIST;
+        } else if (targetDist >= DIST_UPPER_BOUND) {
+            dynamicTolerance = TOLERANCE_AT_UPPER_DIST;
         } else {
-            double ratio = (targetVelocityRPM - RPM_LOWER_BOUND) / (RPM_UPPER_BOUND - RPM_LOWER_BOUND);
-            dynamicTolerance = MAX_TOLERANCE - ratio * (MAX_TOLERANCE - MIN_TOLERANCE);
+            double ratio = (targetDist - DIST_LOWER_BOUND) / (DIST_UPPER_BOUND - DIST_LOWER_BOUND);
+            dynamicTolerance = TOLERANCE_AT_LOWER_DIST - ratio * (TOLERANCE_AT_LOWER_DIST - TOLERANCE_AT_UPPER_DIST);
         }
 
         double currentVelTPS = motorSH.getVelocity();
@@ -79,9 +78,13 @@ public class FlywheelSubsystem {
             isFlywheelReady = false;
         } else {
             if (!isFlywheelReady) {
-                if (currentRPM >= targetVelocityRPM - SPOOL_UP_TOLERANCE) isFlywheelReady = true;
+                if (currentRPM >= targetVelocityRPM - SPOOL_UP_TOLERANCE && currentRPM <= targetVelocityRPM + dynamicTolerance) {
+                    isFlywheelReady = true;
+                }
             } else {
-                if (currentRPM < targetVelocityRPM - dynamicTolerance) isFlywheelReady = false;
+                if (currentRPM < targetVelocityRPM - dynamicTolerance || currentRPM > targetVelocityRPM + dynamicTolerance) {
+                    isFlywheelReady = false;
+                }
             }
         }
 

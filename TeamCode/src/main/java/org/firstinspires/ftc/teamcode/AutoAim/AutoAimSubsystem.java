@@ -1,7 +1,6 @@
 package org.firstinspires.ftc.teamcode.AutoAim;
 
 import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.dashboard.canvas.Canvas;
 import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.arcrobotics.ftclib.controller.PIDFController;
@@ -23,17 +22,19 @@ public class AutoAimSubsystem {
     public static double TURRET_kP = 33.0;
     public static double TURRET_kI = 0.0;
     public static double TURRET_kD = 0.0;
-    public static double TURRET_kF = 0.0001;
+    public static double TURRET_kF = 0.0;
     public static double TURRET_kV = 0.001201;
-    public static double TURRET_kS = 0.03;
+    public static double TURRET_kS = 0.0;
     public static double TURRET_kA = 0.000113;
     public static double TURRET_LATENCY = 0.01;
     public static double TURRET_MAX_POWER = 1.0;
-    public static double TURRET_FILTER_ALPHA = 0.7;
+    public static double TURRET_FILTER_ALPHA = 0.9;
     public static double TURRET_VEL_FILTER_ALPHA = 0.9;
     public static double TURRET_kLinearBraking = 0.008500;
     public static double TURRET_kQuadraticFriction = 0.000098;
     public static double TUNING_VOLTAGE = 13.04;
+    public static double CHASSIS_VEL_DEADBAND = 15;
+    public static double CHASSIS_VEL_FILTER_ALPHA = 0.8;
 
     private PIDFController turretPIDF;
     private final double TICKS_PER_REV = 31087.589;
@@ -50,6 +51,9 @@ public class AutoAimSubsystem {
     private long lastTime = 0;
     private long lastVoltageReadTime = 0;
     private double currentBatteryVoltage = 12.0;
+
+    private double filteredGlobalVx = 0.0;
+    private double filteredGlobalVy = 0.0;
 
     public static class TurretCommand {
         public boolean hasTarget = false;
@@ -103,15 +107,34 @@ public class AutoAimSubsystem {
         TurretCommand command = new TurretCommand();
         AimCalculator.AimResult aimResult;
 
+        long currentTimeForVolts = System.nanoTime();
+        if (currentTimeForVolts - lastVoltageReadTime > 250_000_000L) {
+            currentBatteryVoltage = getBatteryVoltage();
+            lastVoltageReadTime = currentTimeForVolts;
+        }
+
+        double currentSpeed = Math.hypot(globalVx, globalVy);
+        if (currentSpeed < CHASSIS_VEL_DEADBAND) {
+            filteredGlobalVx = 0.0;
+            filteredGlobalVy = 0.0;
+        } else {
+            if (!isFilterInitialized) {
+                filteredGlobalVx = globalVx;
+                filteredGlobalVy = globalVy;
+            } else {
+                filteredGlobalVx = (CHASSIS_VEL_FILTER_ALPHA * globalVx) + ((1.0 - CHASSIS_VEL_FILTER_ALPHA) * filteredGlobalVx);
+                filteredGlobalVy = (CHASSIS_VEL_FILTER_ALPHA * globalVy) + ((1.0 - CHASSIS_VEL_FILTER_ALPHA) * filteredGlobalVy);
+            }
+        }
         if (isManualMode) {
-            double manualRpm = AimCalculator.interpolate(manualDist, 1);
-            double manualPitch = AimCalculator.interpolate(manualDist, 2);
+            double manualRpm = AimCalculator.interpolate(manualDist, 1, currentBatteryVoltage);
+            double manualPitch = AimCalculator.interpolate(manualDist, 2, currentBatteryVoltage);
             aimResult = new AimCalculator.AimResult(manualDist, currentHeadingDeg, manualRpm, manualPitch, 0.0);
         } else {
             double totalTime = AimCalculator.CONSTANT_FLIGHT_TIME + AimCalculator.MECHANICAL_SHOOT_DELAY;
-            double futureX = robotX + (globalVx * totalTime);
-            double futureY = robotY + (globalVy * totalTime);
-            aimResult = AimCalculator.solveAim(futureX, futureY, targetX, targetY);
+            double futureX = robotX + (filteredGlobalVx * totalTime);
+            double futureY = robotY + (filteredGlobalVy * totalTime);
+            aimResult = AimCalculator.solveAim(futureX, futureY, targetX, targetY, currentBatteryVoltage);
         }
 
         if (aimResult != null) {
@@ -120,17 +143,12 @@ public class AutoAimSubsystem {
             command.targetPitch = aimResult.pitch;
             command.targetDist = aimResult.dist;
 
-            double calculatedTolerance = 5.0 + (1.0 - 5.0) / (150.0 - 20.0) * (aimResult.dist - 20.0);
-            command.currentTolerance = Math.max(1.0, Math.min(5.0, calculatedTolerance));
+            double calculatedTolerance = 25.0 + (1.5 - 25.0) / (150.0 - 20.0) * (aimResult.dist - 20.0);
+            command.currentTolerance = Math.max(1.5, Math.min(25.0, calculatedTolerance));
 
             long currentTime = System.nanoTime();
             double dt = (lastTime == 0) ? 0 : (currentTime - lastTime) / 1e9;
             lastTime = currentTime;
-
-            if (currentTime - lastVoltageReadTime > 250_000_000L) {
-                currentBatteryVoltage = getBatteryVoltage();
-                lastVoltageReadTime = currentTime;
-            }
 
             double currentTurretTicks = Turret.getCurrentPosition();
             double rawTurretRelAngle = (currentTurretTicks / TICKS_PER_REV) * 360.0;
@@ -155,7 +173,7 @@ public class AutoAimSubsystem {
             double distSq = dx * dx + dy * dy;
             double translationalOmegaDeg = 0.0;
             if (distSq > 0.001) {
-                double omegaRad = (-dx * globalVy + dy * globalVx) / distSq;
+                double omegaRad = (-dx * filteredGlobalVy + dy * filteredGlobalVx) / distSq;
                 translationalOmegaDeg = Math.toDegrees(omegaRad);
             }
 

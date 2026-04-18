@@ -2,11 +2,11 @@ package org.firstinspires.ftc.teamcode.TeleOp;
 
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
-import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
@@ -17,7 +17,6 @@ import org.firstinspires.ftc.teamcode.Subsystems.FlywheelSubsystem;
 import org.firstinspires.ftc.teamcode.Subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.Subsystems.MecanumDriveSubsystem;
 
-import java.util.List;
 @TeleOp(name = "Unlimited TeleOp AirProMaxNeoSuperUltra", group = "Competition")
 public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
@@ -30,7 +29,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
     private IntakeSubsystem intakeSubsystem;
 
     private final double TARGET_X_WORLD = 135.0;
-    private final double TARGET_Y_WORLD = 136.0;
+    private final double TARGET_Y_WORLD = 133.0;
 
     private boolean isShootingMode = false;
     private boolean lastCircleState = false;
@@ -40,6 +39,12 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
     private double manualTargetDistance = 25.0;
     private double headingOffset = 0.0;
+
+    private boolean lastConditionsMet = false;
+    private long lastRumbleTime = 0;
+
+    private ElapsedTime bbbTimer = new ElapsedTime();
+    private final double BBB_DELAY_MS = 300.0;
 
     @Override
     public void runOpMode() {
@@ -79,12 +84,8 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             double rawHeadingDeg = pos.getHeading(AngleUnit.DEGREES);
             double currentHeadingDeg = rawHeadingDeg - headingOffset;
 
-            double robotVx = odo.getVelX(DistanceUnit.INCH);
-            double robotVy = odo.getVelY(DistanceUnit.INCH);
-            double headingRadForVel = Math.toRadians(currentHeadingDeg);
-
-            double globalVx = robotVx * Math.cos(headingRadForVel) - robotVy * Math.sin(headingRadForVel);
-            double globalVy = robotVx * Math.sin(headingRadForVel) + robotVy * Math.cos(headingRadForVel);
+            double globalVx = odo.getVelX(DistanceUnit.INCH);
+            double globalVy = odo.getVelY(DistanceUnit.INCH);
 
             double y = -gamepad1.left_stick_y;
             double x = gamepad1.left_stick_x * 1.1;
@@ -101,7 +102,10 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             lastSquareState = currentSquareState;
 
             boolean currentCircleState = gamepad1.b;
-            if (currentCircleState && !lastCircleState) isShootingMode = !isShootingMode;
+            if (currentCircleState && !lastCircleState) {
+                isShootingMode = !isShootingMode;
+                if (isShootingMode) bbbTimer.reset();
+            }
             lastCircleState = currentCircleState;
 
             boolean currentLeftBumperState = gamepad1.left_bumper;
@@ -119,10 +123,12 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             double robotOmega = odo.getHeadingVelocity(AngleUnit.DEGREES.getUnnormalized());
 
             AutoAimSubsystem.TurretCommand aimCommand = autoAimSubsystem.update(
-                    rx_odo, ry_odo, globalVx, globalVy, currentHeadingDeg, robotOmega,
+                    rx_odo, ry_odo, globalVx, globalVy, rawHeadingDeg, robotOmega,
                     TARGET_X_WORLD, TARGET_Y_WORLD,
                     isManualMode, manualTargetDistance
             );
+
+            boolean isBBBReady = !isShootingMode || (bbbTimer.milliseconds() >= BBB_DELAY_MS);
 
             double targetVelocityRPM = FlywheelSubsystem.IDLE_VELOCITY_MIN;
             if (isEmergencyBrake) {
@@ -134,14 +140,31 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
                 else bbb.setPosition(0.0);
             }
 
-            flywheelSubsystem.update(targetVelocityRPM, isEmergencyBrake, aimCommand.hasTarget);
+            flywheelSubsystem.update(targetVelocityRPM, aimCommand.targetDist, isEmergencyBrake, aimCommand.hasTarget);
 
             boolean rpmOK = flywheelSubsystem.isReady();
             boolean effectiveAimLocked = isManualMode ? true : aimCommand.isAimLocked;
 
-            intakeSubsystem.update(isShootingMode, aimCommand.hasTarget, aimCommand.isUnwinding, effectiveAimLocked, rpmOK, aimCommand.targetDist);
+            boolean conditionsMet = aimCommand.hasTarget && rpmOK && effectiveAimLocked;
 
-            telemetry.addData("Cycle Speed", "Bulk Caching Active");
+            if (isShootingMode) {
+                if (conditionsMet) {
+                    long currentTime = System.currentTimeMillis();
+                    if (currentTime - lastRumbleTime > 250) {
+                        gamepad1.rumble(0.5, 0.5, 100);
+                        lastRumbleTime = currentTime;
+                    }
+                }
+            } else {
+                if (conditionsMet && !lastConditionsMet) {
+                    gamepad1.rumble(1.0, 1.0, 150);
+                }
+            }
+            lastConditionsMet = conditionsMet;
+
+            intakeSubsystem.update(isShootingMode, aimCommand.hasTarget, aimCommand.isUnwinding, effectiveAimLocked, rpmOK, aimCommand.targetDist, isBBBReady);
+
+            telemetry.addData("BBB Status", isBBBReady ? "READY" : "OPENING...");
             telemetry.addData("Turret Lock", aimCommand.isAimLocked ? "LOCKED" : "TRACKING");
             telemetry.update();
         }
