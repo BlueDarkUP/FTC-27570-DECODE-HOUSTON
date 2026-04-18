@@ -65,7 +65,7 @@ public class IntakeSubsystem {
                         motorIntake.setPower(1.0);
                         systemStatusMessage = "⚡ 跑打强行给弹中 (近战 1.0)!";
                     } else {
-                        motorIntake.setPower(0.6);
+                        motorIntake.setPower(0.65);
                         systemStatusMessage = "⚡ 跑打强行给弹中 (远射 0.9)!";
                     }
                 } else {

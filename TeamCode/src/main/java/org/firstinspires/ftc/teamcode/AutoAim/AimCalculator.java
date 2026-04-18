@@ -33,11 +33,11 @@ public class AimCalculator {
 
     // --- 远射区数据 (Flatline 理念，消除里程计抖动带来的 RPM 震荡) ---
     public static double P7_DIST = 140.0;
-    public static double P7_RPM = 5150;
+    public static double P7_RPM = 5000;
     public static double P7_PITCH = 1.0;
 
     public static double P8_DIST = 160.0;
-    public static double P8_RPM = 5150;
+    public static double P8_RPM = 5050;
     public static double P8_PITCH = 1.0;
 
     // --- 远射电压补偿参数 ---
