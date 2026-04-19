@@ -43,7 +43,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
     private boolean isManualMode = false;
     private boolean lastLeftBumperState = false;
     private boolean lastSquareState = false;
-    private boolean lastRightStickButton = false; // 用于检测右摇杆单次按下
+    private boolean lastRightStickButton = false;
 
     private double manualTargetDistance = 25.0;
     private double headingOffset = 0.0;
@@ -110,7 +110,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             visionCalibrationSuccess = false;
 
             if (currentRightStickButton && !lastRightStickButton && ll != null) {
-                double llInputYaw = AngleUnit.normalizeDegrees(rawHeadingDeg + 180.0);
+                double llInputYaw = AngleUnit.normalizeDegrees(rawHeadingDeg);
                 ll.updateRobotOrientation(llInputYaw);
 
                 LLResult result = ll.getLatestResult();
@@ -119,9 +119,8 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
                     if (botpose != null) {
                         double llRawX_Meters = botpose.getPosition().x;
                         double llRawY_Meters = botpose.getPosition().y;
-
-                        double targetWorldX_Inches = (-llRawX_Meters * 39.3701) + FIELD_OFFSET_X;
-                        double targetWorldY_Inches = (-llRawY_Meters * 39.3701) + FIELD_OFFSET_Y;
+                        double targetWorldX_Inches = (llRawX_Meters * 39.3701) + FIELD_OFFSET_X;
+                        double targetWorldY_Inches = (llRawY_Meters * 39.3701) + FIELD_OFFSET_Y;
 
                         double distToTarget = Math.hypot(TARGET_X_WORLD - rx_odo, TARGET_Y_WORLD - ry_odo);
                         double clampedDist = Math.max(20.0, Math.min(150.0, distToTarget));
