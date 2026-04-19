@@ -28,8 +28,8 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
     private FlywheelSubsystem flywheelSubsystem;
     private IntakeSubsystem intakeSubsystem;
 
-    private final double TARGET_X_WORLD = 135.0;
-    private final double TARGET_Y_WORLD = 133.0;
+    private final double TARGET_X_WORLD = 136.0;
+    private final double TARGET_Y_WORLD = 11;
 
     private boolean isShootingMode = false;
     private boolean lastCircleState = false;

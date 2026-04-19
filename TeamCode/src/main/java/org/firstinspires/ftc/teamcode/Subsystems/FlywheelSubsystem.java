@@ -134,8 +134,8 @@ public class FlywheelSubsystem {
             integralSum = 0;
         }
 
-        // [9] 【关键修改】强制下限为 0.0，严禁飞轮反向通电刹车导致转速剧烈震荡
-        power = Math.max(0.0, Math.min(1.0, power));
+        // [9] 【关键修改】允许下限为 -1.0，允许飞轮反向通电主动刹车以加快减速
+        power = Math.max(-1.0, Math.min(1.0, power));
 
         // [10] 硬件输出
         motorSH.setPower(power);
