@@ -127,8 +127,8 @@ public class AutoAimSubsystem {
             }
         }
         if (isManualMode) {
-            double manualRpm = AimCalculator.interpolate(manualDist, 1, currentBatteryVoltage);
-            double manualPitch = AimCalculator.interpolate(manualDist, 2, currentBatteryVoltage);
+            double manualRpm = AimCalculator.interpolate(manualDist, 1);
+            double manualPitch = AimCalculator.interpolate(manualDist, 2);
             aimResult = new AimCalculator.AimResult(manualDist, currentHeadingDeg, manualRpm, manualPitch, 0.0);
         } else {
             double totalTime = AimCalculator.CONSTANT_FLIGHT_TIME + AimCalculator.MECHANICAL_SHOOT_DELAY;

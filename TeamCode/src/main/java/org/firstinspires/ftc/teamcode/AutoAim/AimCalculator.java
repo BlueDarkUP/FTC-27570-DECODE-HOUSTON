@@ -33,16 +33,12 @@ public class AimCalculator {
 
     // --- 远射区数据 (Flatline 理念，消除里程计抖动带来的 RPM 震荡) ---
     public static double P7_DIST = 140.0;
-    public static double P7_RPM = 3920;
+    public static double P7_RPM = 3970;
     public static double P7_PITCH = 1.0;
 
     public static double P8_DIST = 160.0;
-    public static double P8_RPM = 3920;
+    public static double P8_RPM = 3970;
     public static double P8_PITCH = 1.0;
-
-    // --- 远射电压补偿参数 ---
-    public static double VOLTAGE_BASE = 12.3;         // 5150转速时的基准电压
-    public static double RPM_PER_VOLT_FAR = -300.0;   // 每高于基准电压 1V，远射RPM下降的数值
 
     private static double[][] getShootData() {
         return new double[][] {
@@ -57,7 +53,7 @@ public class AimCalculator {
         };
     }
 
-    public static double interpolate(double dist, int col, double currentVoltage) {
+    public static double interpolate(double dist, int col) {
         double[][] currentData = getShootData();
         double result = currentData[0][col];
 
@@ -81,12 +77,6 @@ public class AimCalculator {
             }
         }
 
-        if (col == 1 && dist >= P7_DIST) {
-            double voltageDiff = currentVoltage - VOLTAGE_BASE;
-            double rpmCompensation = voltageDiff * RPM_PER_VOLT_FAR;
-            result += rpmCompensation;
-        }
-
         return result;
     }
 
@@ -100,8 +90,8 @@ public class AimCalculator {
         return new AimResult(
                 vDist,
                 Math.toDegrees(Math.atan2(dy, dx)),
-                interpolate(vDist, 1, currentVoltage),
-                interpolate(vDist, 2, currentVoltage),
+                interpolate(vDist, 1),
+                interpolate(vDist, 2),
                 CONSTANT_FLIGHT_TIME
         );
     }

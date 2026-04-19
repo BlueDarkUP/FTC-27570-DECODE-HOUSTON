@@ -11,7 +11,7 @@ public class IntakeSubsystem {
 
     private DcMotorEx motorIntake;
 
-    private final double STALL_CURRENT_AMPS = 2.955;
+    private final double STALL_CURRENT_AMPS = 3.1;
     private final double STALL_COOLDOWN_SEC = 0.5;
     private final double STALL_TIME_THRESHOLD_SEC = 0.3;
     private final double CURRENT_READ_INTERVAL = 0.05;
