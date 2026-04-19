@@ -5,7 +5,9 @@ import com.acmerobotics.dashboard.config.Config;
 @Config
 public class AimCalculator {
     public static double MECHANICAL_SHOOT_DELAY = 0;
-    public static double CONSTANT_FLIGHT_TIME = 0.7;
+    public static double CONSTANT_FLIGHT_TIME = 0.7; // 近战与常规滞空时间
+    public static double FAR_FLIGHT_TIME = 0.9;      // 远射滞空时间
+    public static double FAR_DIST_THRESHOLD = 130.0; // 远射判断距离阈值
 
     public static double P1_DIST = 21.0;
     public static double P1_RPM = 2800;
@@ -80,7 +82,7 @@ public class AimCalculator {
         return result;
     }
 
-    public static AimResult solveAim(double futureRx, double futureRy, double tx, double ty, double currentVoltage) {
+    public static AimResult solveAim(double futureRx, double futureRy, double tx, double ty, double flightTime) {
         double dx = tx - futureRx;
         double dy = ty - futureRy;
         double vDist = Math.hypot(dx, dy);
@@ -92,7 +94,7 @@ public class AimCalculator {
                 Math.toDegrees(Math.atan2(dy, dx)),
                 interpolate(vDist, 1),
                 interpolate(vDist, 2),
-                CONSTANT_FLIGHT_TIME
+                flightTime
         );
     }
 

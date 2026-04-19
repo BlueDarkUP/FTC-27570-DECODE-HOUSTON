@@ -196,6 +196,11 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             flywheelSubsystem.update(targetVelocityRPM, isEmergencyBrake, aimCommand.hasTarget);
 
             boolean rpmOK = flywheelSubsystem.isReady();
+
+            if (aimCommand.hasTarget && aimCommand.targetDist >= 130.0) {
+                rpmOK = Math.abs(flywheelSubsystem.getCurrentRPM() - aimCommand.targetRpm) <= 50.0;
+            }
+
             boolean effectiveAimLocked = isManualMode ? true : aimCommand.isAimLocked;
             boolean conditionsMet = aimCommand.hasTarget && rpmOK && effectiveAimLocked;
 
@@ -214,7 +219,18 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             }
             lastConditionsMet = conditionsMet;
 
-            intakeSubsystem.update(isShootingMode, aimCommand.hasTarget, aimCommand.isUnwinding, effectiveAimLocked, rpmOK, aimCommand.targetDist, isBBBReady);
+            intakeSubsystem.update(
+                    isShootingMode,
+                    aimCommand.hasTarget,
+                    aimCommand.isUnwinding,
+                    effectiveAimLocked,
+                    rpmOK,
+                    aimCommand.targetDist,
+                    isBBBReady,
+                    flywheelSubsystem.getCurrentRPM(),
+                    aimCommand.targetRpm,
+                    autoAimSubsystem.getCurrentBatteryVoltage()
+            );
 
             telemetry.addData("Mode", isManualMode ? "MANUAL" : "AUTO-AIM");
             telemetry.addData("Shooting Mode", isShootingMode ? "ACTIVE" : "IDLE");

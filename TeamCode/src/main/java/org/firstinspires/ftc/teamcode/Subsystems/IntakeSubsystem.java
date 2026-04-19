@@ -39,7 +39,7 @@ public class IntakeSubsystem {
         runtime.reset();
     }
 
-    public void update(boolean isShootingMode, boolean hasTarget, boolean isUnwinding, boolean isAimLocked, boolean isFlywheelReady, double targetDist, boolean isBBBReady) {
+    public void update(boolean isShootingMode, boolean hasTarget, boolean isUnwinding, boolean isAimLocked, boolean isFlywheelReady, double targetDist, boolean isBBBReady, double currentRPM, double targetRPM, double batteryVoltage) {
         double currentTime = runtime.seconds();
 
         if (isShootingMode) {
@@ -65,8 +65,15 @@ public class IntakeSubsystem {
                         motorIntake.setPower(1.0);
                         systemStatusMessage = "⚡ 跑打强行给弹中 (近战 1.0)!";
                     } else {
-                        motorIntake.setPower(1);
-                        systemStatusMessage = "⚡ 跑打强行给弹中 (远射 0.9)!";
+                        if (!isFlywheelReady) {
+                            motorIntake.setPower(0.0);
+                            systemStatusMessage = currentRPM < targetRPM ? "⏳ 等待飞轮加速..." : "⏳ 等待飞轮减速...";
+                        } else {
+                            double power = 1.0 - (batteryVoltage - 11.0) * (0.2 / 2.5);
+                            power = Math.max(0.8, Math.min(1.0, power));
+                            motorIntake.setPower(power);
+                            systemStatusMessage = String.format(java.util.Locale.US, "⚡ 跑打强行给弹中 (远射 %.2f)!", power);
+                        }
                     }
                 } else {
                     motorIntake.setPower(0.0);

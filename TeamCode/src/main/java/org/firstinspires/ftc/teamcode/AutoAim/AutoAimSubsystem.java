@@ -88,6 +88,10 @@ public class AutoAimSubsystem {
         return Math.max(8.0, maxVoltage > 0 ? maxVoltage : TUNING_VOLTAGE);
     }
 
+    public double getCurrentBatteryVoltage() {
+        return currentBatteryVoltage;
+    }
+
     private void setPitchServos(double targetPitch) {
         double clampedLP = Math.max(LP_DOWN, Math.min(LP_UP, targetPitch));
         double proportion = (clampedLP - LP_DOWN) / (LP_UP - LP_DOWN);
@@ -126,15 +130,23 @@ public class AutoAimSubsystem {
                 filteredGlobalVy = (CHASSIS_VEL_FILTER_ALPHA * globalVy) + ((1.0 - CHASSIS_VEL_FILTER_ALPHA) * filteredGlobalVy);
             }
         }
+
         if (isManualMode) {
             double manualRpm = AimCalculator.interpolate(manualDist, 1);
             double manualPitch = AimCalculator.interpolate(manualDist, 2);
             aimResult = new AimCalculator.AimResult(manualDist, currentHeadingDeg, manualRpm, manualPitch, 0.0);
         } else {
-            double totalTime = AimCalculator.CONSTANT_FLIGHT_TIME + AimCalculator.MECHANICAL_SHOOT_DELAY;
+            double currentDistToTarget = Math.hypot(targetX - robotX, targetY - robotY);
+            double dynamicFlightTime = (currentDistToTarget >= AimCalculator.FAR_DIST_THRESHOLD) ?
+                    AimCalculator.FAR_FLIGHT_TIME :
+                    AimCalculator.CONSTANT_FLIGHT_TIME;
+
+            double totalTime = dynamicFlightTime + AimCalculator.MECHANICAL_SHOOT_DELAY;
+
             double futureX = robotX + (filteredGlobalVx * totalTime);
             double futureY = robotY + (filteredGlobalVy * totalTime);
-            aimResult = AimCalculator.solveAim(futureX, futureY, targetX, targetY, currentBatteryVoltage);
+
+            aimResult = AimCalculator.solveAim(futureX, futureY, targetX, targetY, dynamicFlightTime);
         }
 
         if (aimResult != null) {
