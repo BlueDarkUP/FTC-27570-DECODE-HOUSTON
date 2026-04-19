@@ -9,35 +9,35 @@ public class AimCalculator {
 
     public static double P1_DIST = 21.0;
     public static double P1_RPM = 2800;
-    public static double P1_PITCH = 0.35;
+    public static double P1_PITCH = 0;
 
     public static double P2_DIST = 60.0;
-    public static double P2_RPM = 3150;
-    public static double P2_PITCH = 0.70;
+    public static double P2_RPM = 3000;
+    public static double P2_PITCH = 0.65;
 
     public static double P3_DIST = 67.1;
     public static double P3_RPM = 3200;
     public static double P3_PITCH = 0.78;
 
     public static double P4_DIST = 89.2;
-    public static double P4_RPM = 3750;
+    public static double P4_RPM = 3600;
     public static double P4_PITCH = 1.0;
 
     public static double P5_DIST = 104.6;
-    public static double P5_RPM = 3750;
+    public static double P5_RPM = 3800;
     public static double P5_PITCH = 1.0;
 
     public static double P6_DIST = 122.3;
-    public static double P6_RPM = 4250;
+    public static double P6_RPM = 4000;
     public static double P6_PITCH = 1.0;
 
     // --- 远射区数据 (Flatline 理念，消除里程计抖动带来的 RPM 震荡) ---
     public static double P7_DIST = 140.0;
-    public static double P7_RPM = 4900;
+    public static double P7_RPM = 3920;
     public static double P7_PITCH = 1.0;
 
     public static double P8_DIST = 160.0;
-    public static double P8_RPM = 4900;
+    public static double P8_RPM = 3920;
     public static double P8_PITCH = 1.0;
 
     // --- 远射电压补偿参数 ---

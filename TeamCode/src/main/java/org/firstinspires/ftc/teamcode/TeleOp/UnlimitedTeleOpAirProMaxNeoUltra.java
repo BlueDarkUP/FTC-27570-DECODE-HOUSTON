@@ -3,6 +3,8 @@ package org.firstinspires.ftc.teamcode.TeleOp;
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Servo;
@@ -11,6 +13,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 
 import org.firstinspires.ftc.teamcode.AutoAim.AutoAimSubsystem;
 import org.firstinspires.ftc.teamcode.Subsystems.FlywheelSubsystem;
@@ -22,6 +25,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
     private Servo bbb;
     private GoBildaPinpointDriver odo;
+    private Limelight3A ll;
 
     private MecanumDriveSubsystem driveSubsystem;
     private AutoAimSubsystem autoAimSubsystem;
@@ -29,19 +33,24 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
     private IntakeSubsystem intakeSubsystem;
 
     private final double TARGET_X_WORLD = 136.0;
-    private final double TARGET_Y_WORLD = 11;
+    private final double TARGET_Y_WORLD = 11.0;
+
+    private final double FIELD_OFFSET_X = 72.0;
+    private final double FIELD_OFFSET_Y = 72.0;
 
     private boolean isShootingMode = false;
     private boolean lastCircleState = false;
     private boolean isManualMode = false;
     private boolean lastLeftBumperState = false;
     private boolean lastSquareState = false;
+    private boolean lastRightStickButton = false; // 用于检测右摇杆单次按下
 
     private double manualTargetDistance = 25.0;
     private double headingOffset = 0.0;
 
     private boolean lastConditionsMet = false;
     private long lastRumbleTime = 0;
+    private boolean visionCalibrationSuccess = false;
 
     private ElapsedTime bbbTimer = new ElapsedTime();
     private final double BBB_DELAY_MS = 300.0;
@@ -62,12 +71,22 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
         odo.setPosition(new Pose2D(DistanceUnit.INCH, 72.0, 72.0, AngleUnit.DEGREES, 0.0));
         odo.update();
 
+        try {
+            ll = hardwareMap.get(Limelight3A.class, "limelight");
+            ll.pipelineSwitch(0);
+            ll.start();
+            telemetry.addLine("[OK] Limelight Ready.");
+        } catch (Exception e) {
+            telemetry.addLine("[ERROR] Limelight Initialisation Failed!");
+            ll = null;
+        }
+
         driveSubsystem = new MecanumDriveSubsystem(hardwareMap);
         autoAimSubsystem = new AutoAimSubsystem(hardwareMap);
         flywheelSubsystem = new FlywheelSubsystem(hardwareMap);
         intakeSubsystem = new IntakeSubsystem(hardwareMap);
 
-        telemetry.addLine("Ready to Start");
+        telemetry.addLine("Ready to Start - Right Stick to Calibrate XY");
         telemetry.update();
 
         waitForStart();
@@ -87,19 +106,49 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             double globalVx = odo.getVelX(DistanceUnit.INCH);
             double globalVy = odo.getVelY(DistanceUnit.INCH);
 
+            boolean currentRightStickButton = gamepad1.right_stick_button;
+            visionCalibrationSuccess = false;
+
+            if (currentRightStickButton && !lastRightStickButton && ll != null) {
+                double llInputYaw = AngleUnit.normalizeDegrees(rawHeadingDeg + 180.0);
+                ll.updateRobotOrientation(llInputYaw);
+
+                LLResult result = ll.getLatestResult();
+                if (result != null && result.isValid()) {
+                    Pose3D botpose = result.getBotpose_MT2();
+                    if (botpose != null) {
+                        double llRawX_Meters = botpose.getPosition().x;
+                        double llRawY_Meters = botpose.getPosition().y;
+
+                        double targetWorldX_Inches = (-llRawX_Meters * 39.3701) + FIELD_OFFSET_X;
+                        double targetWorldY_Inches = (-llRawY_Meters * 39.3701) + FIELD_OFFSET_Y;
+
+                        double distToTarget = Math.hypot(TARGET_X_WORLD - rx_odo, TARGET_Y_WORLD - ry_odo);
+                        double clampedDist = Math.max(20.0, Math.min(150.0, distToTarget));
+
+                        double llWeight = 0.95 - ((clampedDist - 20.0) / (150.0 - 20.0)) * (0.95 - 0.3);
+                        double odoWeight = 1.0 - llWeight;
+
+                        double fusedX = (rx_odo * odoWeight) + (targetWorldX_Inches * llWeight);
+                        double fusedY = (ry_odo * odoWeight) + (targetWorldY_Inches * llWeight);
+
+                        odo.setPosition(new Pose2D(DistanceUnit.INCH, fusedX, fusedY, AngleUnit.DEGREES, rawHeadingDeg));
+
+                        gamepad1.rumble(0.5, 0.5, 200);
+                        visionCalibrationSuccess = true;
+
+                        rx_odo = fusedX;
+                        ry_odo = fusedY;
+                    }
+                }
+            }
+            lastRightStickButton = currentRightStickButton;
+
             double y = -gamepad1.left_stick_y;
             double x = gamepad1.left_stick_x * 1.1;
             double rx_drive = gamepad1.right_stick_x;
 
-            if (gamepad1.right_stick_button) {
-                headingOffset = rawHeadingDeg;
-            }
-
             driveSubsystem.driveFieldCentric(x, y, rx_drive, currentHeadingDeg);
-
-            boolean currentSquareState = gamepad1.x;
-            if (currentSquareState && !lastSquareState) isShootingMode = false;
-            lastSquareState = currentSquareState;
 
             boolean currentCircleState = gamepad1.b;
             if (currentCircleState && !lastCircleState) {
@@ -107,6 +156,10 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
                 if (isShootingMode) bbbTimer.reset();
             }
             lastCircleState = currentCircleState;
+
+            boolean currentSquareState = gamepad1.x;
+            if (currentSquareState && !lastSquareState) isShootingMode = false;
+            lastSquareState = currentSquareState;
 
             boolean currentLeftBumperState = gamepad1.left_bumper;
             if (currentLeftBumperState && !lastLeftBumperState) isManualMode = !isManualMode;
@@ -129,8 +182,8 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             );
 
             boolean isBBBReady = !isShootingMode || (bbbTimer.milliseconds() >= BBB_DELAY_MS);
-
             double targetVelocityRPM = FlywheelSubsystem.IDLE_VELOCITY_MIN;
+
             if (isEmergencyBrake) {
                 targetVelocityRPM = 0;
                 bbb.setPosition(0);
@@ -144,7 +197,6 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
             boolean rpmOK = flywheelSubsystem.isReady();
             boolean effectiveAimLocked = isManualMode ? true : aimCommand.isAimLocked;
-
             boolean conditionsMet = aimCommand.hasTarget && rpmOK && effectiveAimLocked;
 
             if (isShootingMode) {
@@ -164,10 +216,14 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
             intakeSubsystem.update(isShootingMode, aimCommand.hasTarget, aimCommand.isUnwinding, effectiveAimLocked, rpmOK, aimCommand.targetDist, isBBBReady);
 
-            telemetry.addData("BBB Status", isBBBReady ? "READY" : "OPENING...");
-            telemetry.addData("Turret Lock", aimCommand.isAimLocked ? "LOCKED" : "TRACKING");
+            telemetry.addData("Mode", isManualMode ? "MANUAL" : "AUTO-AIM");
+            telemetry.addData("Shooting Mode", isShootingMode ? "ACTIVE" : "IDLE");
+            telemetry.addData("Calibrate State", visionCalibrationSuccess ? "SUCCESS!" : "Wait for Trigger");
+            telemetry.addData("Odo Position", "X: %.1f, Y: %.1f", rx_odo, ry_odo);
             telemetry.update();
         }
+
+        if (ll != null) ll.stop();
         autoAimSubsystem.stop();
         driveSubsystem.stop();
     }
