@@ -33,9 +33,8 @@ public class AutoAimSubsystem {
     public static double TURRET_kLinearBraking = 0.008500;
     public static double TURRET_kQuadraticFriction = 0.000098;
     public static double TUNING_VOLTAGE = 13.04;
-    public static double CHASSIS_VEL_DEADBAND = 10;
+    public static double CHASSIS_VEL_DEADBAND = 5;
     public static double CHASSIS_VEL_FILTER_ALPHA = 0.8;
-    public static double CHASSIS_ACCEL_FILTER_ALPHA = 0.5;
 
     private PIDFController turretPIDF;
     public static double TICKS_PER_REV = 31087.589;
@@ -56,10 +55,6 @@ public class AutoAimSubsystem {
     private boolean isChassisFilterInitialized = false;
     private double filteredGlobalVx = 0.0;
     private double filteredGlobalVy = 0.0;
-    private double lastFilteredGlobalVx = 0.0;
-    private double lastFilteredGlobalVy = 0.0;
-    private double filteredGlobalAx = 0.0;
-    private double filteredGlobalAy = 0.0;
 
     public static class TurretCommand {
         public boolean hasTarget = false;
@@ -129,38 +124,18 @@ public class AutoAimSubsystem {
 
         double currentSpeed = Math.hypot(globalVx, globalVy);
         if (currentSpeed < CHASSIS_VEL_DEADBAND) {
-            filteredGlobalVx = 0.0;
-            filteredGlobalVy = 0.0;
-            filteredGlobalAx = 0.0;
-            filteredGlobalAy = 0.0;
-        } else {
-            if (!isChassisFilterInitialized) {
-                filteredGlobalVx = globalVx;
-                filteredGlobalVy = globalVy;
-                lastFilteredGlobalVx = globalVx;
-                lastFilteredGlobalVy = globalVy;
-                filteredGlobalAx = 0.0;
-                filteredGlobalAy = 0.0;
-                isChassisFilterInitialized = true;
-            } else {
-                filteredGlobalVx = (CHASSIS_VEL_FILTER_ALPHA * globalVx) + ((1.0 - CHASSIS_VEL_FILTER_ALPHA) * filteredGlobalVx);
-                filteredGlobalVy = (CHASSIS_VEL_FILTER_ALPHA * globalVy) + ((1.0 - CHASSIS_VEL_FILTER_ALPHA) * filteredGlobalVy);
-
-                if (dt > 0.0001) {
-                    double rawAx = (filteredGlobalVx - lastFilteredGlobalVx) / dt;
-                    double rawAy = (filteredGlobalVy - lastFilteredGlobalVy) / dt;
-
-                    rawAx = Math.max(-200.0, Math.min(200.0, rawAx));
-                    rawAy = Math.max(-200.0, Math.min(200.0, rawAy));
-
-                    filteredGlobalAx = (CHASSIS_ACCEL_FILTER_ALPHA * rawAx) + ((1.0 - CHASSIS_ACCEL_FILTER_ALPHA) * filteredGlobalAx);
-                    filteredGlobalAy = (CHASSIS_ACCEL_FILTER_ALPHA * rawAy) + ((1.0 - CHASSIS_ACCEL_FILTER_ALPHA) * filteredGlobalAy);
-                }
-            }
+            globalVx = 0.0;
+            globalVy = 0.0;
         }
-        lastFilteredGlobalVx = filteredGlobalVx;
-        lastFilteredGlobalVy = filteredGlobalVy;
 
+        if (!isChassisFilterInitialized) {
+            filteredGlobalVx = globalVx;
+            filteredGlobalVy = globalVy;
+            isChassisFilterInitialized = true;
+        } else {
+            filteredGlobalVx = (CHASSIS_VEL_FILTER_ALPHA * globalVx) + ((1.0 - CHASSIS_VEL_FILTER_ALPHA) * filteredGlobalVx);
+            filteredGlobalVy = (CHASSIS_VEL_FILTER_ALPHA * globalVy) + ((1.0 - CHASSIS_VEL_FILTER_ALPHA) * filteredGlobalVy);
+        }
         if (isManualMode) {
             double manualRpm = AimCalculator.interpolate(manualDist, 1);
             double manualPitch = AimCalculator.interpolate(manualDist, 2);
@@ -173,9 +148,8 @@ public class AutoAimSubsystem {
 
             double totalTime = dynamicFlightTime + AimCalculator.MECHANICAL_SHOOT_DELAY;
 
-            double futureX = robotX + (filteredGlobalVx * totalTime) + (0.5 * filteredGlobalAx * totalTime * totalTime);
-            double futureY = robotY + (filteredGlobalVy * totalTime) + (0.5 * filteredGlobalAy * totalTime * totalTime);
-
+            double futureX = robotX + (filteredGlobalVx * totalTime);
+            double futureY = robotY + (filteredGlobalVy * totalTime);
             aimResult = AimCalculator.solveAim(futureX, futureY, targetX, targetY, dynamicFlightTime);
         }
 
