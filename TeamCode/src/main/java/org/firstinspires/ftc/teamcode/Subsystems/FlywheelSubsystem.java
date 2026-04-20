@@ -13,14 +13,12 @@ public class FlywheelSubsystem {
 
     public static final double IDLE_VELOCITY_MIN = 3000.0;
 
-    // ================= 7天前原版容差与边界参数 =================
     private final double RPM_LOWER_BOUND = 3000.0;
-    private final double RPM_UPPER_BOUND = 5050.0;
+    private final double RPM_UPPER_BOUND = 4000.0;
     private final double MAX_TOLERANCE = 1000;
-    private final double MIN_TOLERANCE = 45; // 恢复旧版的严格要求，解决抛物线飘的问题
+    private final double MIN_TOLERANCE = 1000;
     private final double SPOOL_UP_TOLERANCE = 100.0;
 
-    // ================= 7天前原版 PIDF 参数 =================
     public static double kP = 0.011;
     public static double kI = 0.0004;
     public static double kD = 0.00000023;

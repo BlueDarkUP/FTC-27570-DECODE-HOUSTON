@@ -187,7 +187,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             boolean rpmOK = flywheelSubsystem.isReady();
 
             if (aimCommand.hasTarget && aimCommand.targetDist >= 130.0) {
-                rpmOK = Math.abs(flywheelSubsystem.getCurrentRPM() - aimCommand.targetRpm) <= 50.0;
+                rpmOK = Math.abs(flywheelSubsystem.getCurrentRPM() - aimCommand.targetRpm) <= 114514.0;
             }
 
             boolean effectiveAimLocked = isManualMode ? true : aimCommand.isAimLocked;

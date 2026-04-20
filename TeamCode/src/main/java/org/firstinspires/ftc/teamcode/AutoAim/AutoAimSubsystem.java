@@ -33,18 +33,19 @@ public class AutoAimSubsystem {
     public static double TURRET_kLinearBraking = 0.008500;
     public static double TURRET_kQuadraticFriction = 0.000098;
     public static double TUNING_VOLTAGE = 13.04;
-    public static double CHASSIS_VEL_DEADBAND = 15;
+    public static double CHASSIS_VEL_DEADBAND = 10;
     public static double CHASSIS_VEL_FILTER_ALPHA = 0.8;
+    public static double CHASSIS_ACCEL_FILTER_ALPHA = 0.5;
 
     private PIDFController turretPIDF;
-    private final double TICKS_PER_REV = 31087.589;
-    private final double LP_UP = 1.0;
-    private final double LP_DOWN = 0.4;
-    private final double RP_UP = 0.0;
-    private final double RP_DOWN = 0.5;
+    public static double TICKS_PER_REV = 31087.589;
+    public static double LP_UP = 0.9;
+    public static double LP_DOWN = 0.2;
+    public static double RP_UP = 0.0;
+    public static double RP_DOWN = 0.7;
 
     private double filteredTurretRelAngle = 0.0;
-    private boolean isFilterInitialized = false;
+    private boolean isTurretFilterInitialized = false;
     private double lastTurretRelAngle = 0.0;
     private double filteredTurretVel = 0.0;
     private double lastTargetVel = 0.0;
@@ -52,8 +53,13 @@ public class AutoAimSubsystem {
     private long lastVoltageReadTime = 0;
     private double currentBatteryVoltage = 12.0;
 
+    private boolean isChassisFilterInitialized = false;
     private double filteredGlobalVx = 0.0;
     private double filteredGlobalVy = 0.0;
+    private double lastFilteredGlobalVx = 0.0;
+    private double lastFilteredGlobalVy = 0.0;
+    private double filteredGlobalAx = 0.0;
+    private double filteredGlobalAy = 0.0;
 
     public static class TurretCommand {
         public boolean hasTarget = false;
@@ -117,19 +123,43 @@ public class AutoAimSubsystem {
             lastVoltageReadTime = currentTimeForVolts;
         }
 
+        long currentTimeNanos = System.nanoTime();
+        double dt = (lastTime == 0) ? 0.0001 : (currentTimeNanos - lastTime) / 1e9;
+        lastTime = currentTimeNanos;
+
         double currentSpeed = Math.hypot(globalVx, globalVy);
         if (currentSpeed < CHASSIS_VEL_DEADBAND) {
             filteredGlobalVx = 0.0;
             filteredGlobalVy = 0.0;
+            filteredGlobalAx = 0.0;
+            filteredGlobalAy = 0.0;
         } else {
-            if (!isFilterInitialized) {
+            if (!isChassisFilterInitialized) {
                 filteredGlobalVx = globalVx;
                 filteredGlobalVy = globalVy;
+                lastFilteredGlobalVx = globalVx;
+                lastFilteredGlobalVy = globalVy;
+                filteredGlobalAx = 0.0;
+                filteredGlobalAy = 0.0;
+                isChassisFilterInitialized = true;
             } else {
                 filteredGlobalVx = (CHASSIS_VEL_FILTER_ALPHA * globalVx) + ((1.0 - CHASSIS_VEL_FILTER_ALPHA) * filteredGlobalVx);
                 filteredGlobalVy = (CHASSIS_VEL_FILTER_ALPHA * globalVy) + ((1.0 - CHASSIS_VEL_FILTER_ALPHA) * filteredGlobalVy);
+
+                if (dt > 0.0001) {
+                    double rawAx = (filteredGlobalVx - lastFilteredGlobalVx) / dt;
+                    double rawAy = (filteredGlobalVy - lastFilteredGlobalVy) / dt;
+
+                    rawAx = Math.max(-200.0, Math.min(200.0, rawAx));
+                    rawAy = Math.max(-200.0, Math.min(200.0, rawAy));
+
+                    filteredGlobalAx = (CHASSIS_ACCEL_FILTER_ALPHA * rawAx) + ((1.0 - CHASSIS_ACCEL_FILTER_ALPHA) * filteredGlobalAx);
+                    filteredGlobalAy = (CHASSIS_ACCEL_FILTER_ALPHA * rawAy) + ((1.0 - CHASSIS_ACCEL_FILTER_ALPHA) * filteredGlobalAy);
+                }
             }
         }
+        lastFilteredGlobalVx = filteredGlobalVx;
+        lastFilteredGlobalVy = filteredGlobalVy;
 
         if (isManualMode) {
             double manualRpm = AimCalculator.interpolate(manualDist, 1);
@@ -143,8 +173,8 @@ public class AutoAimSubsystem {
 
             double totalTime = dynamicFlightTime + AimCalculator.MECHANICAL_SHOOT_DELAY;
 
-            double futureX = robotX + (filteredGlobalVx * totalTime);
-            double futureY = robotY + (filteredGlobalVy * totalTime);
+            double futureX = robotX + (filteredGlobalVx * totalTime) + (0.5 * filteredGlobalAx * totalTime * totalTime);
+            double futureY = robotY + (filteredGlobalVy * totalTime) + (0.5 * filteredGlobalAy * totalTime * totalTime);
 
             aimResult = AimCalculator.solveAim(futureX, futureY, targetX, targetY, dynamicFlightTime);
         }
@@ -158,19 +188,15 @@ public class AutoAimSubsystem {
             double calculatedTolerance = 25.0 + (1.5 - 25.0) / (150.0 - 20.0) * (aimResult.dist - 20.0);
             command.currentTolerance = Math.max(1.5, Math.min(25.0, calculatedTolerance));
 
-            long currentTime = System.nanoTime();
-            double dt = (lastTime == 0) ? 0 : (currentTime - lastTime) / 1e9;
-            lastTime = currentTime;
-
             double currentTurretTicks = Turret.getCurrentPosition();
             double rawTurretRelAngle = (currentTurretTicks / TICKS_PER_REV) * 360.0;
 
-            if (!isFilterInitialized) {
+            if (!isTurretFilterInitialized) {
                 filteredTurretRelAngle = rawTurretRelAngle;
                 lastTurretRelAngle = rawTurretRelAngle;
                 filteredTurretVel = 0.0;
                 lastTargetVel = 0.0;
-                isFilterInitialized = true;
+                isTurretFilterInitialized = true;
             } else {
                 filteredTurretRelAngle = (TURRET_FILTER_ALPHA * rawTurretRelAngle) + ((1.0 - TURRET_FILTER_ALPHA) * filteredTurretRelAngle);
                 if (dt > 0.0001) {
@@ -244,13 +270,14 @@ public class AutoAimSubsystem {
 
         } else {
             Turret.setPower(0);
-            isFilterInitialized = false;
+            isTurretFilterInitialized = false;
         }
         return command;
     }
 
     public void stop() {
         Turret.setPower(0);
-        isFilterInitialized = false;
+        isTurretFilterInitialized = false;
+        isChassisFilterInitialized = false;
     }
 }
