@@ -5,21 +5,11 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
-
 import org.firstinspires.ftc.teamcode.GlobalConstants;
 
 public class FlywheelSubsystem {
     private DcMotorEx motorSH;
     private DcMotorEx motorHS;
-
-    private final double FW_MAX_TOLERANCE = 1000;
-    private final double FW_MIN_TOLERANCE = 1000;
-    private final double FW_SPOOL_UP_TOLERANCE = 100.0;
-
-    private final double FW_kP = 0.011;
-    private final double FW_kI = 0.0004;
-    private final double FW_kD = 0.00000023;
-    private final double FW_kF = 0.00033;
 
     private double integralSum = 0;
     private double lastErrorTPS = 0;
@@ -46,21 +36,10 @@ public class FlywheelSubsystem {
         resetTimer();
     }
 
-    public void setTargetRPM(double rpm) {
-        this.targetRPM = rpm;
-    }
-
-    public double getTargetRPM() {
-        return targetRPM;
-    }
-
-    public double getCurrentRPM() {
-        return currentRPM;
-    }
-
-    public boolean isReady() {
-        return isReady;
-    }
+    public void setTargetRPM(double rpm) { this.targetRPM = rpm; }
+    public double getTargetRPM() { return targetRPM; }
+    public double getCurrentRPM() { return currentRPM; }
+    public boolean isReady() { return isReady; }
 
     public void resetTimer() {
         timer.reset();
@@ -77,19 +56,19 @@ public class FlywheelSubsystem {
 
         double dynamicTolerance;
         if (targetRPM <= GlobalConstants.FLYWHEEL_RPM_MIN) {
-            dynamicTolerance = FW_MAX_TOLERANCE;
+            dynamicTolerance = GlobalConstants.FLYWHEEL_MAX_TOLERANCE;
         } else if (targetRPM >= GlobalConstants.FLYWHEEL_RPM_MAX) {
-            dynamicTolerance = FW_MIN_TOLERANCE;
+            dynamicTolerance = GlobalConstants.FLYWHEEL_MIN_TOLERANCE;
         } else {
             double ratio = (targetRPM - GlobalConstants.FLYWHEEL_RPM_MIN) / (GlobalConstants.FLYWHEEL_RPM_MAX - GlobalConstants.FLYWHEEL_RPM_MIN);
-            dynamicTolerance = FW_MAX_TOLERANCE - ratio * (FW_MAX_TOLERANCE - FW_MIN_TOLERANCE);
+            dynamicTolerance = GlobalConstants.FLYWHEEL_MAX_TOLERANCE - ratio * (GlobalConstants.FLYWHEEL_MAX_TOLERANCE - GlobalConstants.FLYWHEEL_MIN_TOLERANCE);
         }
 
         if (targetRPM <= 100) {
             isReady = false;
         } else {
             if (!isReady) {
-                if (currentRPM >= targetRPM - FW_SPOOL_UP_TOLERANCE) {
+                if (currentRPM >= targetRPM - GlobalConstants.FLYWHEEL_SPOOL_UP_TOLERANCE) {
                     isReady = true;
                 }
             } else {
@@ -112,15 +91,18 @@ public class FlywheelSubsystem {
         }
 
         double maxIntegral = 0.25;
-        if (FW_kI != 0) {
-            if (integralSum > maxIntegral / FW_kI) integralSum = maxIntegral / FW_kI;
-            if (integralSum < -maxIntegral / FW_kI) integralSum = -maxIntegral / FW_kI;
+        if (GlobalConstants.FLYWHEEL_kI != 0) {
+            if (integralSum > maxIntegral / GlobalConstants.FLYWHEEL_kI) integralSum = maxIntegral / GlobalConstants.FLYWHEEL_kI;
+            if (integralSum < -maxIntegral / GlobalConstants.FLYWHEEL_kI) integralSum = -maxIntegral / GlobalConstants.FLYWHEEL_kI;
         }
 
         double derivative = (errorTPS - lastErrorTPS) / dt;
         lastErrorTPS = errorTPS;
 
-        double power = (FW_kF * targetVelTPS) + (FW_kP * errorTPS) + (FW_kI * integralSum) + (FW_kD * derivative);
+        double power = (GlobalConstants.FLYWHEEL_kF * targetVelTPS) +
+                (GlobalConstants.FLYWHEEL_kP * errorTPS) +
+                (GlobalConstants.FLYWHEEL_kI * integralSum) +
+                (GlobalConstants.FLYWHEEL_kD * derivative);
 
         double bangBangThreshold = Math.max(50.0, Math.abs(dynamicTolerance) - (Math.abs(dynamicTolerance) / 7.0));
 

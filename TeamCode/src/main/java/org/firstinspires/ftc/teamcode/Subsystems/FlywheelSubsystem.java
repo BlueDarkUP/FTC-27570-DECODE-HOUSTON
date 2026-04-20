@@ -5,22 +5,12 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
-
 import org.firstinspires.ftc.teamcode.GlobalConstants;
 
 public class FlywheelSubsystem {
 
     private DcMotorEx motorSH;
     private DcMotorEx motorHS;
-
-    private final double MAX_TOLERANCE = 1000;
-    private final double MIN_TOLERANCE = 1000;
-    private final double SPOOL_UP_TOLERANCE = 100.0;
-
-    public static double kP = 0.011;
-    public static double kI = 0.0004;
-    public static double kD = 0.00000023;
-    public static double kF = 0.00033;
 
     private ElapsedTime timer = new ElapsedTime();
     private double lastErrorTPS = 0;
@@ -51,14 +41,15 @@ public class FlywheelSubsystem {
     }
 
     public void update(double targetVelocityRPM, boolean isEmergencyBrake, boolean isActiveSpooling) {
+        // [1] 动态容差计算 - 引用 GlobalConstants
         double dynamicTolerance;
         if (targetVelocityRPM <= GlobalConstants.FLYWHEEL_RPM_MIN) {
-            dynamicTolerance = MAX_TOLERANCE;
+            dynamicTolerance = GlobalConstants.FLYWHEEL_MAX_TOLERANCE;
         } else if (targetVelocityRPM >= GlobalConstants.FLYWHEEL_RPM_MAX) {
-            dynamicTolerance = MIN_TOLERANCE;
+            dynamicTolerance = GlobalConstants.FLYWHEEL_MIN_TOLERANCE;
         } else {
             double ratio = (targetVelocityRPM - GlobalConstants.FLYWHEEL_RPM_MIN) / (GlobalConstants.FLYWHEEL_RPM_MAX - GlobalConstants.FLYWHEEL_RPM_MIN);
-            dynamicTolerance = MAX_TOLERANCE - ratio * (MAX_TOLERANCE - MIN_TOLERANCE);
+            dynamicTolerance = GlobalConstants.FLYWHEEL_MAX_TOLERANCE - ratio * (GlobalConstants.FLYWHEEL_MAX_TOLERANCE - GlobalConstants.FLYWHEEL_MIN_TOLERANCE);
         }
 
         double currentVelTPS = motorSH.getVelocity();
@@ -66,11 +57,12 @@ public class FlywheelSubsystem {
         currentRPM = (currentVelTPS * 60.0) / GlobalConstants.FLYWHEEL_TICKS_PER_REV;
         double errorRPM = targetVelocityRPM - currentRPM;
 
+        // [2] 飞轮就绪状态机
         if (!isActiveSpooling) {
             isFlywheelReady = false;
         } else {
             if (!isFlywheelReady) {
-                if (currentRPM >= targetVelocityRPM - SPOOL_UP_TOLERANCE) {
+                if (currentRPM >= targetVelocityRPM - GlobalConstants.FLYWHEEL_SPOOL_UP_TOLERANCE) {
                     isFlywheelReady = true;
                 }
             } else {
@@ -86,6 +78,7 @@ public class FlywheelSubsystem {
 
         double errorTPS = targetVelTPS - currentVelTPS;
 
+        // [3] 积分计算
         if (targetVelocityRPM > 100) {
             integralSum += errorTPS * dt;
         } else {
@@ -93,16 +86,22 @@ public class FlywheelSubsystem {
         }
 
         double maxIntegral = 0.25;
-        if (kI != 0) {
-            if (integralSum > maxIntegral / kI) integralSum = maxIntegral / kI;
-            if (integralSum < -maxIntegral / kI) integralSum = -maxIntegral / kI;
+        if (GlobalConstants.FLYWHEEL_kI != 0) {
+            if (integralSum > maxIntegral / GlobalConstants.FLYWHEEL_kI) integralSum = maxIntegral / GlobalConstants.FLYWHEEL_kI;
+            if (integralSum < -maxIntegral / GlobalConstants.FLYWHEEL_kI) integralSum = -maxIntegral / GlobalConstants.FLYWHEEL_kI;
         }
 
+        // [4] 微分计算
         double derivative = (errorTPS - lastErrorTPS) / dt;
         lastErrorTPS = errorTPS;
 
-        double power = (kF * targetVelTPS) + (kP * errorTPS) + (kI * integralSum) + (kD * derivative);
+        // [5] PIDF 控制律 - 引用 GlobalConstants
+        double power = (GlobalConstants.FLYWHEEL_kF * targetVelTPS) +
+                (GlobalConstants.FLYWHEEL_kP * errorTPS) +
+                (GlobalConstants.FLYWHEEL_kI * integralSum) +
+                (GlobalConstants.FLYWHEEL_kD * derivative);
 
+        // [6] Bang-Bang 补电
         double bangBangThreshold = Math.abs(dynamicTolerance) - (Math.abs(dynamicTolerance) / 7.0);
         activeBoost = "None";
 
@@ -125,15 +124,7 @@ public class FlywheelSubsystem {
         motorHS.setPower(power);
     }
 
-    public boolean isReady() {
-        return isFlywheelReady;
-    }
-
-    public double getCurrentRPM() {
-        return currentRPM;
-    }
-
-    public String getActiveBoostState() {
-        return activeBoost;
-    }
+    public boolean isReady() { return isFlywheelReady; }
+    public double getCurrentRPM() { return currentRPM; }
+    public String getActiveBoostState() { return activeBoost; }
 }
