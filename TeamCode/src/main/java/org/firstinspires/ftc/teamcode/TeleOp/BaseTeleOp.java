@@ -4,7 +4,6 @@ import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
@@ -19,8 +18,7 @@ import org.firstinspires.ftc.teamcode.Subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.Subsystems.MecanumDriveSubsystem;
 import org.firstinspires.ftc.teamcode.GlobalConstants;
 
-@TeleOp(name = "Unlimited TeleOp AirProMaxNeoSuperUltra", group = "Competition")
-public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
+public abstract class BaseTeleOp extends LinearOpMode {
 
     private Servo bbb;
     private GoBildaPinpointDriver odo;
@@ -32,8 +30,15 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
     private FlywheelSubsystem flywheelSubsystem;
     private IntakeSubsystem intakeSubsystem;
 
-    private final double TARGET_X_WORLD = 136.0;
-    private final double TARGET_Y_WORLD = 11.0;
+    // 将目标和偏移量改为由子类提供的变量
+    protected double TARGET_X_WORLD;
+    protected double TARGET_Y_WORLD;
+    protected double headingOffset = 0.0;
+
+    // 抽象方法：强制要求红蓝子类提供特定的数值
+    protected abstract double getTargetX();
+    protected abstract double getTargetY();
+    protected abstract double getHeadingOffset();
 
     private boolean isShootingMode = false;
     private boolean lastCircleState = false;
@@ -43,7 +48,6 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
     private boolean lastRightStickButton = false;
 
     private double manualTargetDistance = 25.0;
-    private double headingOffset = 0.0;
 
     private boolean lastConditionsMet = false;
     private long lastRumbleTime = 0;
@@ -53,6 +57,11 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
     @Override
     public void runOpMode() {
+        // 在初始化阶段获取子类设定的红/蓝方参数
+        TARGET_X_WORLD = getTargetX();
+        TARGET_Y_WORLD = getTargetY();
+        headingOffset = getHeadingOffset();
+
         telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
 
         bbb = hardwareMap.get(Servo.class, "bbb");
@@ -83,6 +92,9 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
         intakeSubsystem = new IntakeSubsystem(hardwareMap);
 
         telemetry.addLine("Ready to Start - Right Stick to Calibrate XY");
+        telemetry.addData("Alliance Target X", TARGET_X_WORLD);
+        telemetry.addData("Alliance Target Y", TARGET_Y_WORLD);
+        telemetry.addData("Heading Offset", headingOffset);
         telemetry.update();
 
         waitForStart();
@@ -97,6 +109,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             double rx_odo = pos.getX(DistanceUnit.INCH);
             double ry_odo = pos.getY(DistanceUnit.INCH);
             double rawHeadingDeg = pos.getHeading(AngleUnit.DEGREES);
+            // 应用红蓝方不同的航向偏移
             double currentHeadingDeg = rawHeadingDeg - headingOffset;
 
             double globalVx = odo.getVelX(DistanceUnit.INCH);
