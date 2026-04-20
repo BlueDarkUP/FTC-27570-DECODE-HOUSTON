@@ -6,12 +6,12 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
+import org.firstinspires.ftc.teamcode.GlobalConstants;
+
 public class FlywheelSubsystem {
     private DcMotorEx motorSH;
     private DcMotorEx motorHS;
 
-    private final double FW_RPM_LOWER_BOUND = 3000.0;
-    private final double FW_RPM_UPPER_BOUND = 5050.0;
     private final double FW_MAX_TOLERANCE = 1000;
     private final double FW_MIN_TOLERANCE = 1000;
     private final double FW_SPOOL_UP_TOLERANCE = 100.0;
@@ -20,7 +20,6 @@ public class FlywheelSubsystem {
     private final double FW_kI = 0.0004;
     private final double FW_kD = 0.00000023;
     private final double FW_kF = 0.00033;
-    private final double FW_TICKS_PER_REV = 28.0;
 
     private double integralSum = 0;
     private double lastErrorTPS = 0;
@@ -71,18 +70,18 @@ public class FlywheelSubsystem {
 
     public void update() {
         double currentVelTPS = motorSH.getVelocity();
-        double targetVelTPS = (targetRPM * FW_TICKS_PER_REV) / 60.0;
+        double targetVelTPS = (targetRPM * GlobalConstants.FLYWHEEL_TICKS_PER_REV) / 60.0;
 
-        currentRPM = (currentVelTPS * 60.0) / FW_TICKS_PER_REV;
+        currentRPM = (currentVelTPS * 60.0) / GlobalConstants.FLYWHEEL_TICKS_PER_REV;
         double errorRPM = targetRPM - currentRPM;
 
         double dynamicTolerance;
-        if (targetRPM <= FW_RPM_LOWER_BOUND) {
+        if (targetRPM <= GlobalConstants.FLYWHEEL_RPM_MIN) {
             dynamicTolerance = FW_MAX_TOLERANCE;
-        } else if (targetRPM >= FW_RPM_UPPER_BOUND) {
+        } else if (targetRPM >= GlobalConstants.FLYWHEEL_RPM_MAX) {
             dynamicTolerance = FW_MIN_TOLERANCE;
         } else {
-            double ratio = (targetRPM - FW_RPM_LOWER_BOUND) / (FW_RPM_UPPER_BOUND - FW_RPM_LOWER_BOUND);
+            double ratio = (targetRPM - GlobalConstants.FLYWHEEL_RPM_MIN) / (GlobalConstants.FLYWHEEL_RPM_MAX - GlobalConstants.FLYWHEEL_RPM_MIN);
             dynamicTolerance = FW_MAX_TOLERANCE - ratio * (FW_MAX_TOLERANCE - FW_MIN_TOLERANCE);
         }
 

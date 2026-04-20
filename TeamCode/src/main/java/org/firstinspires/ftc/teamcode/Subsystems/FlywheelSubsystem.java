@@ -6,15 +6,13 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
+import org.firstinspires.ftc.teamcode.GlobalConstants;
+
 public class FlywheelSubsystem {
 
     private DcMotorEx motorSH;
     private DcMotorEx motorHS;
 
-    public static final double IDLE_VELOCITY_MIN = 3000.0;
-
-    private final double RPM_LOWER_BOUND = 3000.0;
-    private final double RPM_UPPER_BOUND = 4000.0;
     private final double MAX_TOLERANCE = 1000;
     private final double MIN_TOLERANCE = 1000;
     private final double SPOOL_UP_TOLERANCE = 100.0;
@@ -23,8 +21,6 @@ public class FlywheelSubsystem {
     public static double kI = 0.0004;
     public static double kD = 0.00000023;
     public static double kF = 0.00033;
-
-    private final double TICKS_PER_REV = 28.0;
 
     private ElapsedTime timer = new ElapsedTime();
     private double lastErrorTPS = 0;
@@ -44,7 +40,6 @@ public class FlywheelSubsystem {
         motorSH.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         motorHS.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
-        // 维持 FLOAT 模式，配合下文 power 最小值为 0.0 的限制
         motorSH.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
         motorHS.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
     }
@@ -56,23 +51,21 @@ public class FlywheelSubsystem {
     }
 
     public void update(double targetVelocityRPM, boolean isEmergencyBrake, boolean isActiveSpooling) {
-        // [1] 动态容差计算
         double dynamicTolerance;
-        if (targetVelocityRPM <= RPM_LOWER_BOUND) {
+        if (targetVelocityRPM <= GlobalConstants.FLYWHEEL_RPM_MIN) {
             dynamicTolerance = MAX_TOLERANCE;
-        } else if (targetVelocityRPM >= RPM_UPPER_BOUND) {
+        } else if (targetVelocityRPM >= GlobalConstants.FLYWHEEL_RPM_MAX) {
             dynamicTolerance = MIN_TOLERANCE;
         } else {
-            double ratio = (targetVelocityRPM - RPM_LOWER_BOUND) / (RPM_UPPER_BOUND - RPM_LOWER_BOUND);
+            double ratio = (targetVelocityRPM - GlobalConstants.FLYWHEEL_RPM_MIN) / (GlobalConstants.FLYWHEEL_RPM_MAX - GlobalConstants.FLYWHEEL_RPM_MIN);
             dynamicTolerance = MAX_TOLERANCE - ratio * (MAX_TOLERANCE - MIN_TOLERANCE);
         }
 
         double currentVelTPS = motorSH.getVelocity();
-        double targetVelTPS = (targetVelocityRPM * TICKS_PER_REV) / 60.0;
-        currentRPM = (currentVelTPS * 60.0) / TICKS_PER_REV;
+        double targetVelTPS = (targetVelocityRPM * GlobalConstants.FLYWHEEL_TICKS_PER_REV) / 60.0;
+        currentRPM = (currentVelTPS * 60.0) / GlobalConstants.FLYWHEEL_TICKS_PER_REV;
         double errorRPM = targetVelocityRPM - currentRPM;
 
-        // [2] 飞轮就绪状态机（保持了结构，但容差评估基于原版参数）
         if (!isActiveSpooling) {
             isFlywheelReady = false;
         } else {
@@ -87,14 +80,12 @@ public class FlywheelSubsystem {
             }
         }
 
-        // [3] 时间差计算
         double dt = timer.seconds();
         timer.reset();
         if (dt == 0) dt = 1e-9;
 
         double errorTPS = targetVelTPS - currentVelTPS;
 
-        // [4] 积分计算与抗积分饱和 (Anti-Windup)
         if (targetVelocityRPM > 100) {
             integralSum += errorTPS * dt;
         } else {
@@ -107,14 +98,11 @@ public class FlywheelSubsystem {
             if (integralSum < -maxIntegral / kI) integralSum = -maxIntegral / kI;
         }
 
-        // [5] 微分计算
         double derivative = (errorTPS - lastErrorTPS) / dt;
         lastErrorTPS = errorTPS;
 
-        // [6] 原版核心：PIDF 控制律
         double power = (kF * targetVelTPS) + (kP * errorTPS) + (kI * integralSum) + (kD * derivative);
 
-        // [7] 恢复原版 Bang-Bang 极速补电机制
         double bangBangThreshold = Math.abs(dynamicTolerance) - (Math.abs(dynamicTolerance) / 7.0);
         activeBoost = "None";
 
@@ -126,16 +114,13 @@ public class FlywheelSubsystem {
             }
         }
 
-        // [8] 刹车或待机拦截
         if (isEmergencyBrake || targetVelocityRPM <= 0) {
             power = 0;
             integralSum = 0;
         }
 
-        // [9] 【关键修改】允许下限为 -1.0，允许飞轮反向通电主动刹车以加快减速
         power = Math.max(-1.0, Math.min(1.0, power));
 
-        // [10] 硬件输出
         motorSH.setPower(power);
         motorHS.setPower(power);
     }

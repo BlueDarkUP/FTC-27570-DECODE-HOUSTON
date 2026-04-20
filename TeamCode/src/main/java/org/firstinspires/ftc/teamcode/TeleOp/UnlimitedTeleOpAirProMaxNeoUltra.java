@@ -17,6 +17,7 @@ import org.firstinspires.ftc.teamcode.DeadEye.LimelightPinpointLocalizer;
 import org.firstinspires.ftc.teamcode.Subsystems.FlywheelSubsystem;
 import org.firstinspires.ftc.teamcode.Subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.Subsystems.MecanumDriveSubsystem;
+import org.firstinspires.ftc.teamcode.GlobalConstants;
 
 @TeleOp(name = "Unlimited TeleOp AirProMaxNeoSuperUltra", group = "Competition")
 public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
@@ -39,7 +40,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
     private boolean isManualMode = false;
     private boolean lastLeftBumperState = false;
     private boolean lastSquareState = false;
-    private boolean lastRightStickButton = false; // 用于检测右摇杆单次按下
+    private boolean lastRightStickButton = false;
 
     private double manualTargetDistance = 25.0;
     private double headingOffset = 0.0;
@@ -49,14 +50,13 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
     private boolean visionCalibrationSuccess = false;
 
     private ElapsedTime bbbTimer = new ElapsedTime();
-    private final double BBB_DELAY_MS = 300.0;
 
     @Override
     public void runOpMode() {
         telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
 
         bbb = hardwareMap.get(Servo.class, "bbb");
-        bbb.setPosition(0);
+        bbb.setPosition(GlobalConstants.BBB_IDLE_POS);
 
         odo = hardwareMap.get(GoBildaPinpointDriver.class, "odo");
         odo.setOffsets(101.16, -160, DistanceUnit.MM);
@@ -106,9 +106,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             visionCalibrationSuccess = false;
 
             if (currentRightStickButton && !lastRightStickButton && visionLocalizer != null) {
-
                 Pose2D visionPose = visionLocalizer.getTransformedPose(rawHeadingDeg);
-
                 if (visionPose != null) {
                     double targetWorldX_Inches = visionPose.getX(DistanceUnit.INCH);
                     double targetWorldY_Inches = visionPose.getY(DistanceUnit.INCH);
@@ -170,22 +168,21 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
                     isManualMode, manualTargetDistance
             );
 
-            boolean isBBBReady = !isShootingMode || (bbbTimer.milliseconds() >= BBB_DELAY_MS);
-            double targetVelocityRPM = FlywheelSubsystem.IDLE_VELOCITY_MIN;
+            boolean isBBBReady = !isShootingMode || (bbbTimer.milliseconds() >= GlobalConstants.BBB_DELAY_MS);
+            double targetVelocityRPM = GlobalConstants.FLYWHEEL_RPM_MIN;
 
             if (isEmergencyBrake) {
                 targetVelocityRPM = 0;
-                bbb.setPosition(0);
+                bbb.setPosition(GlobalConstants.BBB_IDLE_POS);
             } else if (aimCommand.hasTarget) {
                 targetVelocityRPM = aimCommand.targetRpm;
-                if (isShootingMode) bbb.setPosition(0.18);
-                else bbb.setPosition(0.0);
+                if (isShootingMode) bbb.setPosition(GlobalConstants.BBB_SHOOT_POS);
+                else bbb.setPosition(GlobalConstants.BBB_IDLE_POS);
             }
 
             flywheelSubsystem.update(targetVelocityRPM, isEmergencyBrake, aimCommand.hasTarget);
 
             boolean rpmOK = flywheelSubsystem.isReady();
-
             if (aimCommand.hasTarget && aimCommand.targetDist >= 130.0) {
                 rpmOK = Math.abs(flywheelSubsystem.getCurrentRPM() - aimCommand.targetRpm) <= 114514.0;
             }

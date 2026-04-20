@@ -10,17 +10,13 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-
-// 引入你的子系统包
+import org.firstinspires.ftc.teamcode.GlobalConstants;
 import org.firstinspires.ftc.teamcode.Subsystems.ForAuto.*;
 
 @Autonomous(name = "蓝方开两次门", group = "Autonomous")
 public class BLUEclose2gate extends OpMode {
 
-    // 底盘跟随器
     private Follower follower;
-
-    // 复用子系统
     private PitchSubsystem pitch;
     private TurretSubsystem turret;
     private FlywheelSubsystem flywheel;
@@ -30,7 +26,6 @@ public class BLUEclose2gate extends OpMode {
     private Timer opmodeTimer;
     private int pathState;
 
-    // 根据新路线声明路径
     public PathChain fasheyuzhi;
     public PathChain xidiyipai;
     public PathChain kaimen;
@@ -42,7 +37,6 @@ public class BLUEclose2gate extends OpMode {
     public PathChain fashedisanpai;
     public PathChain tingkao;
 
-    // 起始点基于新路线第一段起点
     private final Pose startPose = new Pose(35.000, 135.000, Math.toRadians(180));
 
     public void buildPaths() {
@@ -158,34 +152,30 @@ public class BLUEclose2gate extends OpMode {
 
     public void autonomousPathUpdate() {
         switch (pathState) {
-            // ================== 阶段 1：起步并发射预置球 ==================
             case 10:
                 follower.followPath(fasheyuzhi, true);
-                turret.setTargetAngle(-53.0);    // 根据要求，起步云台改为 -53.0
-                flywheel.setTargetRPM(3250.0);   // 全程转速 3250
+                turret.setTargetAngle(-53.0);
+                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(11);
                 break;
             case 11:
-                // 到位后不等待，直接开火
                 if (!follower.isBusy()) {
-                    intakeShooter.startPrecisionShoot(0.5);
+                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(12);
                 }
                 break;
             case 12:
-                // 等待0.5秒发射动作结束
                 if (!intakeShooter.isShootingActive()) {
                     setPathState(20);
                 }
                 break;
 
-            // ================== 阶段 2：吸取第一排 ==================
             case 20:
-                pitch.setPitch(0.75);
-                flywheel.setTargetRPM(3350.0);
+                pitch.setPitch(GlobalConstants.PITCH_POS_INTAKE_NORMAL);
+                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_DOOR_1);
                 follower.followPath(xidiyipai, false);
-                intakeShooter.setIntakePower(1.0); // 打开 Intake
+                intakeShooter.setIntakePower(1.0);
                 setPathState(21);
                 break;
             case 21:
@@ -194,7 +184,6 @@ public class BLUEclose2gate extends OpMode {
                 }
                 break;
 
-            // ================== 阶段 3：第一次开门 ==================
             case 30:
                 follower.followPath(kaimen, true);
                 intakeShooter.setIntakePower(0.0);
@@ -203,8 +192,8 @@ public class BLUEclose2gate extends OpMode {
                 break;
             case 31:
                 if (!follower.isBusy()) {
-                    pathTimer.resetTimer(); // 增加重置时间
-                    setPathState(32);       // 增加新等待阶段
+                    pathTimer.resetTimer();
+                    setPathState(32);
                 }
                 break;
             case 32:
@@ -213,15 +202,13 @@ public class BLUEclose2gate extends OpMode {
                 }
                 break;
 
-            // ================== 阶段 4：回发第一排 ==================
             case 40:
                 follower.followPath(fashediyipai, true);
                 setPathState(41);
                 break;
             case 41:
-                // 到位后不等待，直接开火
                 if (!follower.isBusy()) {
-                    intakeShooter.startPrecisionShoot(0.5);
+                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(42);
                 }
                 break;
@@ -231,10 +218,9 @@ public class BLUEclose2gate extends OpMode {
                 }
                 break;
 
-            // ================== 阶段 5：吸取第二排（开第二次门的前置） ==================
             case 50:
                 follower.followPath(kaidiercimen, false);
-                intakeShooter.setIntakePower(1.0); // 开启 Intake 吸入第二排
+                intakeShooter.setIntakePower(1.0);
                 setPathState(51);
                 break;
             case 51:
@@ -243,7 +229,6 @@ public class BLUEclose2gate extends OpMode {
                 }
                 break;
 
-            // ================== 阶段 6：第二次开门 (Path10) ==================
             case 60:
                 follower.followPath(Path10, true);
                 intakeShooter.setIntakePower(0.0);
@@ -251,8 +236,8 @@ public class BLUEclose2gate extends OpMode {
                 break;
             case 61:
                 if (!follower.isBusy()) {
-                    pathTimer.resetTimer(); // 增加重置时间
-                    setPathState(62);       // 增加新等待阶段
+                    pathTimer.resetTimer();
+                    setPathState(62);
                 }
                 break;
             case 62:
@@ -261,15 +246,13 @@ public class BLUEclose2gate extends OpMode {
                 }
                 break;
 
-            // ================== 阶段 7：回发第二排 ==================
             case 70:
                 follower.followPath(fashedierpai, true);
                 setPathState(71);
                 break;
             case 71:
-                // 到位后不等待，直接开火
                 if (!follower.isBusy()) {
-                    intakeShooter.startPrecisionShoot(0.5);
+                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(72);
                 }
                 break;
@@ -279,10 +262,9 @@ public class BLUEclose2gate extends OpMode {
                 }
                 break;
 
-            // ================== 阶段 8：吸取第三排 ==================
             case 80:
                 follower.followPath(xidisanpai, false);
-                intakeShooter.setIntakePower(1.0); // 打开 Intake
+                intakeShooter.setIntakePower(1.0);
                 setPathState(81);
                 break;
             case 81:
@@ -291,16 +273,14 @@ public class BLUEclose2gate extends OpMode {
                 }
                 break;
 
-            // ================== 阶段 9：回发第三排 ==================
             case 90:
                 follower.followPath(fashedisanpai, true);
-                intakeShooter.setIntakePower(0.0); // 回去发射前停止吸取
+                intakeShooter.setIntakePower(0.0);
                 setPathState(91);
                 break;
             case 91:
-                // 到位后不等待，直接开火
                 if (!follower.isBusy()) {
-                    intakeShooter.startPrecisionShoot(0.5);
+                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(92);
                 }
                 break;
@@ -310,10 +290,9 @@ public class BLUEclose2gate extends OpMode {
                 }
                 break;
 
-            // ================== 阶段 10：最终停靠 ==================
             case 100:
                 follower.followPath(tingkao, true);
-                turret.setTargetAngle(0.0); // 停靠云台回到角度 0
+                turret.setTargetAngle(0.0);
                 setPathState(101);
                 break;
             case 101:
@@ -322,11 +301,10 @@ public class BLUEclose2gate extends OpMode {
                 }
                 break;
 
-            // ================== 阶段 11：程序结束 ==================
             case 110:
                 flywheel.setTargetRPM(0.0);
                 intakeShooter.setIntakePower(0.0);
-                intakeShooter.setBBServo(0.0);
+                intakeShooter.setBBServo(GlobalConstants.BBB_IDLE_POS);
                 setPathState(-1);
                 break;
         }
@@ -336,14 +314,10 @@ public class BLUEclose2gate extends OpMode {
     public void init() {
         pathTimer = new Timer();
         opmodeTimer = new Timer();
-
-        // 初始化各个子系统
         pitch = new PitchSubsystem(hardwareMap);
         turret = new TurretSubsystem(hardwareMap);
         flywheel = new FlywheelSubsystem(hardwareMap);
         intakeShooter = new IntakeShooterSubsystem(hardwareMap);
-
-        // 初始化底盘与路径
         follower = Constants.createFollower(hardwareMap);
         buildPaths();
         follower.setStartingPose(startPose);
@@ -351,7 +325,7 @@ public class BLUEclose2gate extends OpMode {
 
     @Override
     public void init_loop() {
-        pitch.setPitch(1.0); // 俯仰维持1
+        pitch.setPitch(GlobalConstants.PITCH_POS_DEFAULT);
         turret.update();
         flywheel.update();
     }
@@ -361,22 +335,17 @@ public class BLUEclose2gate extends OpMode {
         opmodeTimer.resetTimer();
         turret.resetTimer();
         flywheel.resetTimer();
-
         setPathState(10);
     }
 
     @Override
     public void loop() {
-        // 整个自动阶段维持俯仰1
-        pitch.setPitch(1.0);
-
+        pitch.setPitch(GlobalConstants.PITCH_POS_DEFAULT);
         follower.update();
         autonomousPathUpdate();
-
         turret.update();
         flywheel.update();
         intakeShooter.update(flywheel);
-
         telemetry.addData("Path State", pathState);
         telemetry.addData("Shoot Mode", intakeShooter.getCurrentShootMode());
         telemetry.addData("Turret Target Angle", turret.getTargetAngle());

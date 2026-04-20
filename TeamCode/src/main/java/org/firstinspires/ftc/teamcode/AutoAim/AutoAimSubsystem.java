@@ -10,6 +10,8 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 
+import org.firstinspires.ftc.teamcode.GlobalConstants;
+
 @Config
 public class AutoAimSubsystem {
 
@@ -37,11 +39,6 @@ public class AutoAimSubsystem {
     public static double CHASSIS_VEL_FILTER_ALPHA = 0.8;
 
     private PIDFController turretPIDF;
-    public static double TICKS_PER_REV = 31087.589;
-    public static double LP_UP = 0.9;
-    public static double LP_DOWN = 0.2;
-    public static double RP_UP = 0.0;
-    public static double RP_DOWN = 0.7;
 
     private double filteredTurretRelAngle = 0.0;
     private boolean isTurretFilterInitialized = false;
@@ -94,9 +91,9 @@ public class AutoAimSubsystem {
     }
 
     private void setPitchServos(double targetPitch) {
-        double clampedLP = Math.max(LP_DOWN, Math.min(LP_UP, targetPitch));
-        double proportion = (clampedLP - LP_DOWN) / (LP_UP - LP_DOWN);
-        double calculatedRP = RP_DOWN + proportion * (RP_UP - RP_DOWN);
+        double clampedLP = Math.max(GlobalConstants.PITCH_LP_DOWN, Math.min(GlobalConstants.PITCH_LP_UP, targetPitch));
+        double proportion = (clampedLP - GlobalConstants.PITCH_LP_DOWN) / (GlobalConstants.PITCH_LP_UP - GlobalConstants.PITCH_LP_DOWN);
+        double calculatedRP = GlobalConstants.PITCH_RP_DOWN + proportion * (GlobalConstants.PITCH_RP_UP - GlobalConstants.PITCH_RP_DOWN);
         calculatedRP = Math.max(0.0, Math.min(1.0, calculatedRP));
         LP.setPosition(clampedLP);
         RP.setPosition(calculatedRP);
@@ -163,7 +160,7 @@ public class AutoAimSubsystem {
             command.currentTolerance = Math.max(1.5, Math.min(25.0, calculatedTolerance));
 
             double currentTurretTicks = Turret.getCurrentPosition();
-            double rawTurretRelAngle = (currentTurretTicks / TICKS_PER_REV) * 360.0;
+            double rawTurretRelAngle = (currentTurretTicks / GlobalConstants.TURRET_TICKS_PER_REV) * 360.0;
 
             if (!isTurretFilterInitialized) {
                 filteredTurretRelAngle = rawTurretRelAngle;

@@ -10,6 +10,8 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
+import org.firstinspires.ftc.teamcode.GlobalConstants;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,7 +21,6 @@ public class TurretFullAutoTuner extends OpMode {
 
     private DcMotorEx Turret;
 
-    public static double TICKS_PER_REV = 31087.589; //TODO: 确认实际云台绕一圈编码器读数
     public static double MAX_SAFE_ANGLE = 170.0;
     public static double BRAKE_BUFFER_ANGLE = 35.0;
     public static double RETURN_POWER = 0.3;
@@ -65,13 +66,11 @@ public class TurretFullAutoTuner extends OpMode {
     private double pbStartBrakeAngle = 0.0;
     private double pbMeasuredBrakeVel = 0.0;
 
-    // 数据样本集
     private final List<Double> ksSamples = new ArrayList<>();
     private final List<double[]> kvData = new ArrayList<>();
     private final List<double[]> kaData = new ArrayList<>();
     private final List<double[]> pbData = new ArrayList<>();
 
-    // 最终系数
     private double rawKs = 0, rawKv = 0, rawKa = 0, rawKLin = 0, rawKQuad = 0;
     private double compKs = 0, compKv = 0, compKa = 0, compKLin = 0, compKQuad = 0;
     private double avgTestVoltage = 0;
@@ -119,7 +118,7 @@ public class TurretFullAutoTuner extends OpMode {
         lastTime = currentTime;
 
         double currentTicks = Turret.getCurrentPosition();
-        double currentAngle = (currentTicks / TICKS_PER_REV) * 360.0;
+        double currentAngle = (currentTicks / GlobalConstants.TURRET_TICKS_PER_REV) * 360.0;
 
         if (voltageTimer.milliseconds() > 250 && state != State.DONE && state != State.CALCULATE) {
             currentVoltage = getBatteryVoltage();

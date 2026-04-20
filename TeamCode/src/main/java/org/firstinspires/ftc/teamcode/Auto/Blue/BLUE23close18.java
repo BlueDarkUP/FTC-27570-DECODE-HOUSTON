@@ -10,15 +10,13 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
+import org.firstinspires.ftc.teamcode.GlobalConstants;
 import org.firstinspires.ftc.teamcode.Subsystems.ForAuto.*;
 
 @Autonomous(name = "近点18球自动", group = "Autonomous")
 public class BLUE23close18 extends OpMode {
 
-    // 结构/底盘控制 (直接沿用 PedroPathing)
     private Follower follower;
-
-    // 复用模块实例化
     private PitchSubsystem pitch;
     private TurretSubsystem turret;
     private FlywheelSubsystem flywheel;
@@ -129,7 +127,7 @@ public class BLUE23close18 extends OpMode {
     public void autonomousPathUpdate() {
         switch (pathState) {
             case 10:
-                flywheel.setTargetRPM(3250);
+                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 follower.followPath(diyigepaoda, true);
                 turret.setTargetAngle(-48.0);
                 intakeShooter.setIntakePower(0.0);
@@ -142,7 +140,7 @@ public class BLUE23close18 extends OpMode {
                 break;
             case 115:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
-                    intakeShooter.startPrecisionShoot(0.5);
+                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(12);
                 }
                 break;
@@ -156,9 +154,9 @@ public class BLUE23close18 extends OpMode {
             case 20:
                 follower.setMaxPower(1);
                 follower.followPath(xidierpai, false);
-                intakeShooter.setBBServo(0.0);
+                intakeShooter.setBBServo(GlobalConstants.BBB_IDLE_POS);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3250);
+                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 setPathState(21);
                 break;
             case 21:
@@ -168,7 +166,7 @@ public class BLUE23close18 extends OpMode {
             case 30:
                 follower.followPath(fashedierpai, true);
                 turret.setTargetAngle(-93.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(31);
                 break;
@@ -179,7 +177,7 @@ public class BLUE23close18 extends OpMode {
                 break;
             case 315:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
-                    intakeShooter.startPrecisionShoot(0.5);
+                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(32);
                 }
                 break;
@@ -193,7 +191,7 @@ public class BLUE23close18 extends OpMode {
             case 40:
                 follower.followPath(kaimenzuo, true);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 setPathState(41);
                 break;
             case 41:
@@ -210,7 +208,7 @@ public class BLUE23close18 extends OpMode {
             case 50:
                 follower.followPath(fashekaimenzuo, true);
                 turret.setTargetAngle(-93.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(1.0);
                 setPathState(51);
                 break;
@@ -221,7 +219,7 @@ public class BLUE23close18 extends OpMode {
                 break;
             case 515:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
-                    intakeShooter.startPrecisionShoot(0.5);
+                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(52);
                 }
                 break;
@@ -239,7 +237,7 @@ public class BLUE23close18 extends OpMode {
 
             case 60:
                 follower.followPath(zhunbeixidiyipai, false);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(1.0);
                 setPathState(61);
                 break;
@@ -261,7 +259,7 @@ public class BLUE23close18 extends OpMode {
             case 80:
                 follower.followPath(fashediyipai, true);
                 turret.setTargetAngle(-93.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(81);
                 break;
@@ -272,7 +270,7 @@ public class BLUE23close18 extends OpMode {
                 break;
             case 815:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
-                    intakeShooter.startPrecisionShoot(0.5);
+                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(82);
                 }
                 break;
@@ -282,7 +280,7 @@ public class BLUE23close18 extends OpMode {
 
             case 90:
                 follower.followPath(zhunbeixidisanpai, false);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(1.0);
                 setPathState(91);
                 break;
@@ -304,7 +302,7 @@ public class BLUE23close18 extends OpMode {
             case 110:
                 follower.followPath(Returntofixedlaunchpoint, true);
                 turret.setTargetAngle(-26.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(111);
                 break;
@@ -315,7 +313,7 @@ public class BLUE23close18 extends OpMode {
                 break;
             case 1115:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
-                    intakeShooter.startPrecisionShoot(0.5);
+                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(112);
                 }
                 break;
@@ -327,7 +325,7 @@ public class BLUE23close18 extends OpMode {
                 turret.setTargetAngle(0.0);
                 flywheel.setTargetRPM(0.0);
                 intakeShooter.setIntakePower(0.0);
-                intakeShooter.setBBServo(0.0);
+                intakeShooter.setBBServo(GlobalConstants.BBB_IDLE_POS);
                 setPathState(121);
                 break;
             case 121:
@@ -341,14 +339,10 @@ public class BLUE23close18 extends OpMode {
         pathTimer = new Timer();
         opmodeTimer = new Timer();
         doorExtractLoopCount = 0;
-
-        // 初始化子系统
         pitch = new PitchSubsystem(hardwareMap);
         turret = new TurretSubsystem(hardwareMap);
         flywheel = new FlywheelSubsystem(hardwareMap);
         intakeShooter = new IntakeShooterSubsystem(hardwareMap);
-
-        // 初始化底盘
         follower = Constants.createFollower(hardwareMap);
         buildPaths();
         follower.setStartingPose(startPose);
@@ -356,7 +350,7 @@ public class BLUE23close18 extends OpMode {
 
     @Override
     public void init_loop() {
-        pitch.setPitch(0.7);
+        pitch.setPitch(GlobalConstants.PITCH_POS_INTAKE_DEEP);
         turret.update();
         flywheel.update();
     }
@@ -366,21 +360,17 @@ public class BLUE23close18 extends OpMode {
         opmodeTimer.resetTimer();
         turret.resetTimer();
         flywheel.resetTimer();
-
         setPathState(10);
     }
 
     @Override
     public void loop() {
-        pitch.setPitch(0.87);
-
+        pitch.setPitch(GlobalConstants.PITCH_POS_TRANSIT);
         follower.update();
         autonomousPathUpdate();
-
         turret.update();
         flywheel.update();
         intakeShooter.update(flywheel);
-
         telemetry.addData("Path State", pathState);
         telemetry.addData("Shoot Mode", intakeShooter.getCurrentShootMode());
         telemetry.addData("RPM Current/Target", "%.1f / %.1f", flywheel.getCurrentRPM(), flywheel.getTargetRPM());

@@ -10,17 +10,13 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
-
-// 引入你的子系统包
+import org.firstinspires.ftc.teamcode.GlobalConstants;
 import org.firstinspires.ftc.teamcode.Subsystems.ForAuto.*;
 
 @Autonomous(name = "BLUEclose2gateZUO", group = "Autonomous")
 public class BLUEclose2gateZUO extends OpMode {
 
-    // 底盘跟随器
     private Follower follower;
-
-    // 复用子系统
     private PitchSubsystem pitch;
     private TurretSubsystem turret;
     private FlywheelSubsystem flywheel;
@@ -28,10 +24,9 @@ public class BLUEclose2gateZUO extends OpMode {
 
     private Timer pathTimer;
     private Timer opmodeTimer;
-    private Timer loopTimer; // 新增：专门用于记录开门嘬循环是否到达10秒的计时器
+    private Timer loopTimer;
     private int pathState;
 
-    // 路径声明
     public PathChain fasheyuzhi;
     public PathChain xidiyipai;
     public PathChain kaimen;
@@ -45,7 +40,6 @@ public class BLUEclose2gateZUO extends OpMode {
     public PathChain fashedisanpai;
     public PathChain tingkao;
 
-    // 起始点
     private final Pose startPose = new Pose(35.000, 135.000, Math.toRadians(180));
 
     public void buildPaths() {
@@ -122,8 +116,6 @@ public class BLUEclose2gateZUO extends OpMode {
                 .setConstantHeadingInterpolation(Math.toRadians(180))
                 .build();
 
-        // ================== Path11 和 Path12 占位符 ==================
-        // 请在此处填入你实际抓取的开门嘬与发射坐标
         Path11 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
@@ -145,7 +137,6 @@ public class BLUEclose2gateZUO extends OpMode {
                 )
                 .setLinearHeadingInterpolation(Math.toRadians(157), Math.toRadians(180))
                 .build();
-        // =============================================================
 
         xidisanpai = follower.pathBuilder()
                 .addPath(
@@ -186,22 +177,21 @@ public class BLUEclose2gateZUO extends OpMode {
 
     public void autonomousPathUpdate() {
         switch (pathState) {
-            // ================== 1. 预制并发射 ==================
             case 10:
                 follower.followPath(fasheyuzhi, true);
                 turret.setTargetAngle(-51.5);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(11);
                 break;
             case 11:
                 if (!follower.isBusy()) {
-                    setPathState(12); // 进入等待微调状态，自动重置 pathTimer
+                    setPathState(12);
                 }
                 break;
             case 12:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) { // 等待0.2秒让底盘微调
-                    intakeShooter.startPrecisionShoot(0.45);
+                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(13);
                 }
                 break;
@@ -211,7 +201,6 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
 
-            // ================== 2. 吸第一排 ==================
             case 20:
                 follower.followPath(xidiyipai, false);
                 intakeShooter.setIntakePower(1.0);
@@ -223,10 +212,9 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
 
-            // ================== 3. 第一次开门 (等待1秒) ==================
             case 30:
-                pitch.setPitch(0.7);
-                flywheel.setTargetRPM(3400.0);
+                pitch.setPitch(GlobalConstants.PITCH_POS_INTAKE_DEEP);
+                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_DOOR_2);
                 follower.followPath(kaimen, false);
                 intakeShooter.setIntakePower(0.0);
                 turret.setTargetAngle(-50.3);
@@ -244,19 +232,18 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
 
-            // ================== 4. 射第一排 ==================
             case 40:
                 follower.followPath(fashediyipai, true);
                 setPathState(41);
                 break;
             case 41:
                 if (!follower.isBusy()) {
-                    setPathState(42); // 进入等待微调状态
+                    setPathState(42);
                 }
                 break;
             case 42:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) { // 等待0.2秒让底盘微调
-                    intakeShooter.startPrecisionShoot(0.45);
+                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(43);
                 }
                 break;
@@ -266,7 +253,6 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
 
-            // ================== 5. 吸第二排 ==================
             case 50:
                 follower.followPath(kaidiercimen, false);
                 intakeShooter.setIntakePower(1.0);
@@ -278,7 +264,6 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
 
-            // ================== 6. 第二次开门 (等待1秒) ==================
             case 60:
                 follower.followPath(Path10, false);
                 intakeShooter.setIntakePower(0.0);
@@ -296,19 +281,18 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
 
-            // ================== 7. 射第二排 ==================
             case 70:
                 follower.followPath(fashedierpai, true);
                 setPathState(71);
                 break;
             case 71:
                 if (!follower.isBusy()) {
-                    setPathState(72); // 进入等待微调状态
+                    setPathState(72);
                 }
                 break;
             case 72:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) { // 等待0.2秒让底盘微调
-                    intakeShooter.startPrecisionShoot(0.45);
+                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(73);
                 }
                 break;
@@ -319,58 +303,49 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
 
-            // ================== 8. 持续10秒的开门嘬与发射循环 ==================
             case 80:
-                // 每次准备出发去吸取前，检查循环是否已经过了 10 秒
                 if (loopTimer.getElapsedTimeSeconds() >= 10.0) {
-                    // 大于等于10秒，强制退出循环，去吸第三排
                     setPathState(90);
                 } else {
-                    // 时间未满10秒，出发去执行 Path11
-                    follower.followPath(Path11, true); // holdEnd
+                    follower.followPath(Path11, true);
                     intakeShooter.setIntakePower(1.0);
                     setPathState(81);
                 }
                 break;
             case 81:
                 if (!follower.isBusy()) {
-                    // 到达位置，重置常规路径计时器，准备非阻塞等待2秒
                     pathTimer.resetTimer();
                     setPathState(82);
                 }
                 break;
             case 82:
-                // 原地嘬 2 秒
                 turret.setTargetAngle(-52.5);
                 if (pathTimer.getElapsedTimeSeconds() >= 1.5) {
                     setPathState(83);
                 }
                 break;
             case 83:
-                // 执行 Path12 返回发射
-                follower.followPath(Path12, true); // holdEnd
+                follower.followPath(Path12, true);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(84);
                 break;
             case 84:
                 if (!follower.isBusy()) {
-                    setPathState(85); // 进入等待微调状态
+                    setPathState(85);
                 }
                 break;
             case 85:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) { // 等待0.2秒让底盘微调
-                    intakeShooter.startPrecisionShoot(0.45);
+                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(86);
                 }
                 break;
             case 86:
                 if (!intakeShooter.isShootingActive()) {
-                    // 射击完成，回到循环起点 80，重新判断时间
                     setPathState(80);
                 }
                 break;
 
-            // ================== 9. 吸第三排 ==================
             case 90:
                 turret.setTargetAngle(-50.3);
                 follower.followPath(xidisanpai, false);
@@ -383,7 +358,6 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
 
-            // ================== 10. 射第三排 ==================
             case 100:
                 follower.followPath(fashedisanpai, true);
                 intakeShooter.setIntakePower(0.0);
@@ -391,12 +365,12 @@ public class BLUEclose2gateZUO extends OpMode {
                 break;
             case 101:
                 if (!follower.isBusy()) {
-                    setPathState(102); // 进入等待微调状态
+                    setPathState(102);
                 }
                 break;
             case 102:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) { // 等待0.2秒让底盘微调
-                    intakeShooter.startPrecisionShoot(0.45);
+                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(103);
                 }
                 break;
@@ -406,7 +380,6 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
 
-            // ================== 11. 最终停靠 ==================
             case 110:
                 follower.followPath(tingkao, true);
                 turret.setTargetAngle(0.0);
@@ -418,11 +391,10 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
 
-            // ================== 结束 ==================
             case 120:
                 flywheel.setTargetRPM(0.0);
                 intakeShooter.setIntakePower(0.0);
-                intakeShooter.setBBServo(0.0);
+                intakeShooter.setBBServo(GlobalConstants.BBB_IDLE_POS);
                 setPathState(-1);
                 break;
         }
@@ -432,13 +404,11 @@ public class BLUEclose2gateZUO extends OpMode {
     public void init() {
         pathTimer = new Timer();
         opmodeTimer = new Timer();
-        loopTimer = new Timer(); // 初始化循环计时器
-
+        loopTimer = new Timer();
         pitch = new PitchSubsystem(hardwareMap);
         turret = new TurretSubsystem(hardwareMap);
         flywheel = new FlywheelSubsystem(hardwareMap);
         intakeShooter = new IntakeShooterSubsystem(hardwareMap);
-
         follower = Constants.createFollower(hardwareMap);
         buildPaths();
         follower.setStartingPose(startPose);
@@ -446,7 +416,7 @@ public class BLUEclose2gateZUO extends OpMode {
 
     @Override
     public void init_loop() {
-        pitch.setPitch(1.0);
+        pitch.setPitch(GlobalConstants.PITCH_POS_DEFAULT);
         turret.update();
         flywheel.update();
     }
@@ -456,21 +426,17 @@ public class BLUEclose2gateZUO extends OpMode {
         opmodeTimer.resetTimer();
         turret.resetTimer();
         flywheel.resetTimer();
-
         setPathState(10);
     }
 
     @Override
     public void loop() {
-        pitch.setPitch(1.0);
-
+        pitch.setPitch(GlobalConstants.PITCH_POS_DEFAULT);
         follower.update();
         autonomousPathUpdate();
-
         turret.update();
         flywheel.update();
         intakeShooter.update(flywheel);
-
         telemetry.addData("Path State", pathState);
         telemetry.addData("Shoot Mode", intakeShooter.getCurrentShootMode());
         telemetry.addData("Turret Angle", turret.getTargetAngle());

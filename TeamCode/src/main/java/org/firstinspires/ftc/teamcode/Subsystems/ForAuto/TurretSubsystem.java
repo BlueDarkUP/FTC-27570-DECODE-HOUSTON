@@ -5,6 +5,8 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
+import org.firstinspires.ftc.teamcode.GlobalConstants;
+
 public class TurretSubsystem {
     private DcMotorEx turretMotor;
 
@@ -22,8 +24,8 @@ public class TurretSubsystem {
     private final double MAX_INTEGRAL_POWER = 0.08;
 
     private final double ERROR_TOLERANCE = 1.5;
-    private final double TURRET_TICKS_PER_REV = 31087.589;
-    private final double TICKS_PER_DEGREE = TURRET_TICKS_PER_REV / 360.0;
+    // 使用全局常量
+    private final double TICKS_PER_DEGREE = GlobalConstants.TURRET_TICKS_PER_REV / 360.0;
 
     private double integralSum = 0;
     private double lastError = 0;
@@ -42,30 +44,18 @@ public class TurretSubsystem {
         resetTimer();
     }
 
-    public void setTargetAngle(double angle) {
-        this.targetAngle = angle;
-    }
-
-    public double getTargetAngle() {
-        return targetAngle;
-    }
-
-    public void resetTimer() {
-        pidTimer.reset();
-        integralSum = 0;
-        lastError = 0;
-    }
+    // ...其余代码不变...
+    public void setTargetAngle(double angle) { this.targetAngle = angle; }
+    public double getTargetAngle() { return targetAngle; }
+    public void resetTimer() { pidTimer.reset(); integralSum = 0; lastError = 0; }
 
     public void update() {
         double currentTicks = turretMotor.getCurrentPosition();
         double currentAngle = currentTicks / TICKS_PER_DEGREE;
-
         double error = targetAngle - currentAngle;
         double absError = Math.abs(error);
-
         double dt = pidTimer.seconds();
         if (dt == 0) dt = 0.001;
-
         double power = 0.0;
 
         if (absError <= ERROR_TOLERANCE) {
@@ -103,7 +93,5 @@ public class TurretSubsystem {
         pidTimer.reset();
     }
 
-    public void stop() {
-        turretMotor.setPower(0);
-    }
+    public void stop() { turretMotor.setPower(0); }
 }
