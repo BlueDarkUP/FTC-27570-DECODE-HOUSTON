@@ -3,8 +3,6 @@ package org.firstinspires.ftc.teamcode.TeleOp;
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
-import com.qualcomm.hardware.limelightvision.LLResult;
-import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Servo;
@@ -13,9 +11,9 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
-import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 
 import org.firstinspires.ftc.teamcode.AutoAim.AutoAimSubsystem;
+import org.firstinspires.ftc.teamcode.DeadEye.LimelightPinpointLocalizer;
 import org.firstinspires.ftc.teamcode.Subsystems.FlywheelSubsystem;
 import org.firstinspires.ftc.teamcode.Subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.Subsystems.MecanumDriveSubsystem;
@@ -25,7 +23,8 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
 
     private Servo bbb;
     private GoBildaPinpointDriver odo;
-    private Limelight3A ll;
+
+    private LimelightPinpointLocalizer visionLocalizer;
 
     private MecanumDriveSubsystem driveSubsystem;
     private AutoAimSubsystem autoAimSubsystem;
@@ -35,15 +34,12 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
     private final double TARGET_X_WORLD = 136.0;
     private final double TARGET_Y_WORLD = 11.0;
 
-    private final double FIELD_OFFSET_X = 72.0;
-    private final double FIELD_OFFSET_Y = 72.0;
-
     private boolean isShootingMode = false;
     private boolean lastCircleState = false;
     private boolean isManualMode = false;
     private boolean lastLeftBumperState = false;
     private boolean lastSquareState = false;
-    private boolean lastRightStickButton = false;
+    private boolean lastRightStickButton = false; // 用于检测右摇杆单次按下
 
     private double manualTargetDistance = 25.0;
     private double headingOffset = 0.0;
@@ -72,13 +68,13 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
         odo.update();
 
         try {
-            ll = hardwareMap.get(Limelight3A.class, "limelight");
-            ll.pipelineSwitch(0);
-            ll.start();
-            telemetry.addLine("[OK] Limelight Ready.");
+            visionLocalizer = new LimelightPinpointLocalizer(hardwareMap, "limelight");
+            visionLocalizer.start();
+            visionLocalizer.getLimelight().pipelineSwitch(0);
+            telemetry.addLine("[OK] Limelight Localizer Ready.");
         } catch (Exception e) {
             telemetry.addLine("[ERROR] Limelight Initialisation Failed!");
-            ll = null;
+            visionLocalizer = null;
         }
 
         driveSubsystem = new MecanumDriveSubsystem(hardwareMap);
@@ -109,36 +105,30 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             boolean currentRightStickButton = gamepad1.right_stick_button;
             visionCalibrationSuccess = false;
 
-            if (currentRightStickButton && !lastRightStickButton && ll != null) {
-                double llInputYaw = AngleUnit.normalizeDegrees(rawHeadingDeg);
-                ll.updateRobotOrientation(llInputYaw);
+            if (currentRightStickButton && !lastRightStickButton && visionLocalizer != null) {
 
-                LLResult result = ll.getLatestResult();
-                if (result != null && result.isValid()) {
-                    Pose3D botpose = result.getBotpose_MT2();
-                    if (botpose != null) {
-                        double llRawX_Meters = botpose.getPosition().x;
-                        double llRawY_Meters = botpose.getPosition().y;
-                        double targetWorldX_Inches = (llRawX_Meters * 39.3701) + FIELD_OFFSET_X;
-                        double targetWorldY_Inches = (llRawY_Meters * 39.3701) + FIELD_OFFSET_Y;
+                Pose2D visionPose = visionLocalizer.getTransformedPose(rawHeadingDeg);
 
-                        double distToTarget = Math.hypot(TARGET_X_WORLD - rx_odo, TARGET_Y_WORLD - ry_odo);
-                        double clampedDist = Math.max(20.0, Math.min(150.0, distToTarget));
+                if (visionPose != null) {
+                    double targetWorldX_Inches = visionPose.getX(DistanceUnit.INCH);
+                    double targetWorldY_Inches = visionPose.getY(DistanceUnit.INCH);
 
-                        double llWeight = 0.95 - ((clampedDist - 20.0) / (150.0 - 20.0)) * (0.95 - 0.3);
-                        double odoWeight = 1.0 - llWeight;
+                    double distToTarget = Math.hypot(TARGET_X_WORLD - rx_odo, TARGET_Y_WORLD - ry_odo);
+                    double clampedDist = Math.max(20.0, Math.min(150.0, distToTarget));
 
-                        double fusedX = (rx_odo * odoWeight) + (targetWorldX_Inches * llWeight);
-                        double fusedY = (ry_odo * odoWeight) + (targetWorldY_Inches * llWeight);
+                    double llWeight = 0.95 - ((clampedDist - 20.0) / (150.0 - 20.0)) * (0.95 - 0.3);
+                    double odoWeight = 1.0 - llWeight;
 
-                        odo.setPosition(new Pose2D(DistanceUnit.INCH, fusedX, fusedY, AngleUnit.DEGREES, rawHeadingDeg));
+                    double fusedX = (rx_odo * odoWeight) + (targetWorldX_Inches * llWeight);
+                    double fusedY = (ry_odo * odoWeight) + (targetWorldY_Inches * llWeight);
 
-                        gamepad1.rumble(0.5, 0.5, 200);
-                        visionCalibrationSuccess = true;
+                    odo.setPosition(new Pose2D(DistanceUnit.INCH, fusedX, fusedY, AngleUnit.DEGREES, rawHeadingDeg));
 
-                        rx_odo = fusedX;
-                        ry_odo = fusedY;
-                    }
+                    gamepad1.rumble(0.5, 0.5, 200);
+                    visionCalibrationSuccess = true;
+
+                    rx_odo = fusedX;
+                    ry_odo = fusedY;
                 }
             }
             lastRightStickButton = currentRightStickButton;
@@ -238,7 +228,7 @@ public class UnlimitedTeleOpAirProMaxNeoUltra extends LinearOpMode {
             telemetry.update();
         }
 
-        if (ll != null) ll.stop();
+        if (visionLocalizer != null) visionLocalizer.stop();
         autoAimSubsystem.stop();
         driveSubsystem.stop();
     }
