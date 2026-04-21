@@ -16,6 +16,7 @@ import org.firstinspires.ftc.teamcode.DeadEye.LimelightPinpointLocalizer;
 import org.firstinspires.ftc.teamcode.Subsystems.FlywheelSubsystem;
 import org.firstinspires.ftc.teamcode.Subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.Subsystems.MecanumDriveSubsystem;
+import org.firstinspires.ftc.teamcode.Subsystems.ClimbSubsystem;
 import org.firstinspires.ftc.teamcode.GlobalConstants;
 
 public abstract class BaseTeleOp extends LinearOpMode {
@@ -29,13 +30,11 @@ public abstract class BaseTeleOp extends LinearOpMode {
     private AutoAimSubsystem autoAimSubsystem;
     private FlywheelSubsystem flywheelSubsystem;
     private IntakeSubsystem intakeSubsystem;
-
-    // 将目标和偏移量改为由子类提供的变量
+    private ClimbSubsystem climbSubsystem;
     protected double TARGET_X_WORLD;
     protected double TARGET_Y_WORLD;
     protected double headingOffset = 0.0;
 
-    // 抽象方法：强制要求红蓝子类提供特定的数值
     protected abstract double getTargetX();
     protected abstract double getTargetY();
     protected abstract double getHeadingOffset();
@@ -46,6 +45,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
     private boolean lastLeftBumperState = false;
     private boolean lastSquareState = false;
     private boolean lastRightStickButton = false;
+    private boolean lastBackState = false;
 
     private double manualTargetDistance = 25.0;
 
@@ -57,7 +57,6 @@ public abstract class BaseTeleOp extends LinearOpMode {
 
     @Override
     public void runOpMode() {
-        // 在初始化阶段获取子类设定的红/蓝方参数
         TARGET_X_WORLD = getTargetX();
         TARGET_Y_WORLD = getTargetY();
         headingOffset = getHeadingOffset();
@@ -90,6 +89,8 @@ public abstract class BaseTeleOp extends LinearOpMode {
         autoAimSubsystem = new AutoAimSubsystem(hardwareMap);
         flywheelSubsystem = new FlywheelSubsystem(hardwareMap);
         intakeSubsystem = new IntakeSubsystem(hardwareMap);
+        climbSubsystem = new ClimbSubsystem();
+        climbSubsystem.init(hardwareMap);
 
         telemetry.addLine("Ready to Start - Right Stick to Calibrate XY");
         telemetry.addData("Alliance Target X", TARGET_X_WORLD);
@@ -109,12 +110,10 @@ public abstract class BaseTeleOp extends LinearOpMode {
             double rx_odo = pos.getX(DistanceUnit.INCH);
             double ry_odo = pos.getY(DistanceUnit.INCH);
             double rawHeadingDeg = pos.getHeading(AngleUnit.DEGREES);
-            // 应用红蓝方不同的航向偏移
             double currentHeadingDeg = rawHeadingDeg - headingOffset;
 
             double globalVx = odo.getVelX(DistanceUnit.INCH);
             double globalVy = odo.getVelY(DistanceUnit.INCH);
-
             boolean currentRightStickButton = gamepad1.right_stick_button;
             visionCalibrationSuccess = false;
 
@@ -123,32 +122,40 @@ public abstract class BaseTeleOp extends LinearOpMode {
                 if (visionPose != null) {
                     double targetWorldX_Inches = visionPose.getX(DistanceUnit.INCH);
                     double targetWorldY_Inches = visionPose.getY(DistanceUnit.INCH);
-
                     double distToTarget = Math.hypot(TARGET_X_WORLD - rx_odo, TARGET_Y_WORLD - ry_odo);
                     double clampedDist = Math.max(20.0, Math.min(150.0, distToTarget));
-
                     double llWeight = 0.95 - ((clampedDist - 20.0) / (150.0 - 20.0)) * (0.95 - 0.3);
                     double odoWeight = 1.0 - llWeight;
-
                     double fusedX = (rx_odo * odoWeight) + (targetWorldX_Inches * llWeight);
                     double fusedY = (ry_odo * odoWeight) + (targetWorldY_Inches * llWeight);
 
                     odo.setPosition(new Pose2D(DistanceUnit.INCH, fusedX, fusedY, AngleUnit.DEGREES, rawHeadingDeg));
-
                     gamepad1.rumble(0.5, 0.5, 200);
                     visionCalibrationSuccess = true;
-
                     rx_odo = fusedX;
                     ry_odo = fusedY;
                 }
             }
             lastRightStickButton = currentRightStickButton;
 
-            double y = -gamepad1.left_stick_y;
-            double x = gamepad1.left_stick_x * 1.1;
-            double rx_drive = gamepad1.right_stick_x;
+            boolean isClimbing = gamepad1.touchpad;
 
-            driveSubsystem.driveFieldCentric(x, y, rx_drive, currentHeadingDeg);
+            boolean currentBackState = gamepad1.back;
+            if (currentBackState && !lastBackState) {
+                climbSubsystem.togglePto();
+            }
+            lastBackState = currentBackState;
+
+            if (isClimbing) {
+                climbSubsystem.runAutoClimb(true, telemetry);
+            } else {
+                climbSubsystem.runAutoClimb(false, telemetry);
+
+                double y = -gamepad1.left_stick_y;
+                double x = gamepad1.left_stick_x * 1.1;
+                double rx_drive = gamepad1.right_stick_x;
+                driveSubsystem.driveFieldCentric(x, y, rx_drive, currentHeadingDeg);
+            }
 
             boolean currentCircleState = gamepad1.b;
             if (currentCircleState && !lastCircleState) {
@@ -233,8 +240,8 @@ public abstract class BaseTeleOp extends LinearOpMode {
 
             telemetry.addData("Mode", isManualMode ? "MANUAL" : "AUTO-AIM");
             telemetry.addData("Shooting Mode", isShootingMode ? "ACTIVE" : "IDLE");
+            telemetry.addData("PTO State", climbSubsystem.isPtoUnlocked() ? "UNLOCKED" : "LOCKED");
             telemetry.addData("Calibrate State", visionCalibrationSuccess ? "SUCCESS!" : "Wait for Trigger");
-            telemetry.addData("Odo Position", "X: %.1f, Y: %.1f", rx_odo, ry_odo);
             telemetry.update();
         }
 
