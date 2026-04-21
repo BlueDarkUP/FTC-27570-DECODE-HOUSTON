@@ -39,7 +39,15 @@ public class IntakeSubsystem {
         runtime.reset();
     }
 
-    public void update(boolean isShootingMode, boolean hasTarget, boolean isUnwinding, boolean isAimLocked, boolean isFlywheelReady, double targetDist, boolean isBBBReady, double currentRPM, double targetRPM, double batteryVoltage) {
+    public void update(boolean isShootingMode, boolean hasTarget, boolean isUnwinding, boolean isAimLocked, boolean isFlywheelReady, double targetDist, boolean isBBBReady, double currentRPM, double targetRPM, double batteryVoltage, boolean isClimbing) {
+
+        if (isClimbing) {
+            motorIntake.setPower(0.0);
+            systemStatusMessage = "🧗 爬升模式锁定：停止进件";
+            isStalling = false;
+            return;
+        }
+
         double currentTime = runtime.seconds();
 
         if (isShootingMode) {

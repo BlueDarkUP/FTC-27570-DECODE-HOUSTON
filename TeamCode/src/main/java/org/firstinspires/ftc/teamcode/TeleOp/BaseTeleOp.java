@@ -179,13 +179,14 @@ public abstract class BaseTeleOp extends LinearOpMode {
                 else if (gamepad1.dpad_down) manualTargetDistance = 150.0;
             }
 
-            boolean isEmergencyBrake = gamepad1.right_bumper;
+            boolean isEmergencyBrake = gamepad1.right_bumper || isClimbing;
             double robotOmega = odo.getHeadingVelocity(AngleUnit.DEGREES.getUnnormalized());
 
             AutoAimSubsystem.TurretCommand aimCommand = autoAimSubsystem.update(
                     rx_odo, ry_odo, globalVx, globalVy, rawHeadingDeg, robotOmega,
                     TARGET_X_WORLD, TARGET_Y_WORLD,
-                    isManualMode, manualTargetDistance
+                    isManualMode, manualTargetDistance,
+                    isClimbing
             );
 
             boolean isBBBReady = !isShootingMode || (bbbTimer.milliseconds() >= GlobalConstants.BBB_DELAY_MS);
@@ -235,7 +236,8 @@ public abstract class BaseTeleOp extends LinearOpMode {
                     isBBBReady,
                     flywheelSubsystem.getCurrentRPM(),
                     aimCommand.targetRpm,
-                    autoAimSubsystem.getCurrentBatteryVoltage()
+                    autoAimSubsystem.getCurrentBatteryVoltage(),
+                    isClimbing
             );
 
             telemetry.addData("Mode", isManualMode ? "MANUAL" : "AUTO-AIM");

@@ -103,7 +103,7 @@ public class AutoAimSubsystem {
             double robotX, double robotY, double globalVx, double globalVy,
             double currentHeadingDeg, double robotAngularVelocityDeg,
             double targetX, double targetY,
-            boolean isManualMode, double manualDist) {
+            boolean isManualMode, double manualDist, boolean isClimbing) {
 
         turretPIDF.setPIDF(TURRET_kP, TURRET_kI, TURRET_kD, TURRET_kF);
         TurretCommand command = new TurretCommand();
@@ -119,6 +119,54 @@ public class AutoAimSubsystem {
         double dt = (lastTime == 0) ? 0.0001 : (currentTimeNanos - lastTime) / 1e9;
         lastTime = currentTimeNanos;
 
+        double currentTurretTicks = Turret.getCurrentPosition();
+        double rawTurretRelAngle = (currentTurretTicks / GlobalConstants.TURRET_TICKS_PER_REV) * 360.0;
+
+        if (!isTurretFilterInitialized) {
+            filteredTurretRelAngle = rawTurretRelAngle;
+            lastTurretRelAngle = rawTurretRelAngle;
+            filteredTurretVel = 0.0;
+            lastTargetVel = 0.0;
+            isTurretFilterInitialized = true;
+        } else {
+            filteredTurretRelAngle = (TURRET_FILTER_ALPHA * rawTurretRelAngle) + ((1.0 - TURRET_FILTER_ALPHA) * filteredTurretRelAngle);
+            if (dt > 0.0001) {
+                double rawVel = (rawTurretRelAngle - lastTurretRelAngle) / dt;
+                filteredTurretVel = (TURRET_VEL_FILTER_ALPHA * rawVel) + ((1.0 - TURRET_VEL_FILTER_ALPHA) * filteredTurretVel);
+            }
+        }
+        lastTurretRelAngle = rawTurretRelAngle;
+
+        if (isClimbing) {
+            command.hasTarget = false;
+            command.targetRpm = 0.0;
+            command.targetPitch = 0.0;
+            command.isUnwinding = false;
+
+            double targetTurretRelAngle = 0.0;
+            double predictedRelAngle = filteredTurretRelAngle;
+
+            double pidOutputVel = turretPIDF.calculate(predictedRelAngle, targetTurretRelAngle);
+            double finalTargetVel = pidOutputVel;
+
+            double targetAccel = 0.0;
+            if (dt > 0.0001) targetAccel = (finalTargetVel - lastTargetVel) / dt;
+            lastTargetVel = finalTargetVel;
+
+            double turretPower = (targetAccel * TURRET_kA)
+                    + (finalTargetVel * TURRET_kV)
+                    + (Math.signum(finalTargetVel) * TURRET_kS);
+
+            double voltageCompensationRatio = TUNING_VOLTAGE / currentBatteryVoltage;
+            turretPower *= voltageCompensationRatio;
+            turretPower = Math.max(-TURRET_MAX_POWER, Math.min(TURRET_MAX_POWER, turretPower));
+
+            Turret.setPower(turretPower);
+            setPitchServos(command.targetPitch);
+
+            return command;
+        }
+
         double currentSpeed = Math.hypot(globalVx, globalVy);
         if (currentSpeed < CHASSIS_VEL_DEADBAND) {
             globalVx = 0.0;
@@ -133,6 +181,7 @@ public class AutoAimSubsystem {
             filteredGlobalVx = (CHASSIS_VEL_FILTER_ALPHA * globalVx) + ((1.0 - CHASSIS_VEL_FILTER_ALPHA) * filteredGlobalVx);
             filteredGlobalVy = (CHASSIS_VEL_FILTER_ALPHA * globalVy) + ((1.0 - CHASSIS_VEL_FILTER_ALPHA) * filteredGlobalVy);
         }
+
         if (isManualMode) {
             double manualRpm = AimCalculator.interpolate(manualDist, 1);
             double manualPitch = AimCalculator.interpolate(manualDist, 2);
@@ -158,24 +207,6 @@ public class AutoAimSubsystem {
 
             double calculatedTolerance = 25.0 + (1.5 - 25.0) / (150.0 - 20.0) * (aimResult.dist - 20.0);
             command.currentTolerance = Math.max(1.5, Math.min(25.0, calculatedTolerance));
-
-            double currentTurretTicks = Turret.getCurrentPosition();
-            double rawTurretRelAngle = (currentTurretTicks / GlobalConstants.TURRET_TICKS_PER_REV) * 360.0;
-
-            if (!isTurretFilterInitialized) {
-                filteredTurretRelAngle = rawTurretRelAngle;
-                lastTurretRelAngle = rawTurretRelAngle;
-                filteredTurretVel = 0.0;
-                lastTargetVel = 0.0;
-                isTurretFilterInitialized = true;
-            } else {
-                filteredTurretRelAngle = (TURRET_FILTER_ALPHA * rawTurretRelAngle) + ((1.0 - TURRET_FILTER_ALPHA) * filteredTurretRelAngle);
-                if (dt > 0.0001) {
-                    double rawVel = (rawTurretRelAngle - lastTurretRelAngle) / dt;
-                    filteredTurretVel = (TURRET_VEL_FILTER_ALPHA * rawVel) + ((1.0 - TURRET_VEL_FILTER_ALPHA) * filteredTurretVel);
-                }
-            }
-            lastTurretRelAngle = rawTurretRelAngle;
 
             double dx = targetX - robotX;
             double dy = targetY - robotY;
@@ -241,7 +272,6 @@ public class AutoAimSubsystem {
 
         } else {
             Turret.setPower(0);
-            isTurretFilterInitialized = false;
         }
         return command;
     }
