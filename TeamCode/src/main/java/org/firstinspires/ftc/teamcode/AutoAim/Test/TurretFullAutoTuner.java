@@ -22,8 +22,8 @@ public class TurretFullAutoTuner extends OpMode {
     private DcMotorEx Turret;
 
     public static double MAX_SAFE_ANGLE = 170.0;
-    public static double BRAKE_BUFFER_ANGLE = 35.0;
-    public static double RETURN_POWER = 0.3;
+    public static double BRAKE_BUFFER_ANGLE = 40.0;
+    public static double RETURN_POWER = 0.5;
     public static int REST_TIME_MS = 500;
 
     public static double[] KV_TEST_POWERS = {0.3, 0.45, 0.6, 0.75, 0.8, 0.9, 1.0};
@@ -32,8 +32,8 @@ public class TurretFullAutoTuner extends OpMode {
     public static double PB_BRAKING_POWER = 0.3;
     public static int PB_SPIN_TIME_MS = 3000;
 
-    public static double VEL_FILTER_ALPHA = 0.85;
-    public static double ACCEL_FILTER_ALPHA = 0.20;
+    public static double VEL_FILTER_ALPHA = 0.9;
+    public static double ACCEL_FILTER_ALPHA = 0.9;
     public static double NOMINAL_VOLTAGE = 12.0;
 
     private enum State {

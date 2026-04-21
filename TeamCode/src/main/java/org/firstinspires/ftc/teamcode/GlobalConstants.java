@@ -8,7 +8,7 @@ public class GlobalConstants {
     // =========================================
     // 1. 硬件核心参数 (Ticks / Offsets)
     // =========================================
-    public static double TURRET_TICKS_PER_REV = 31087.589;
+    public static double TURRET_TICKS_PER_REV = 32768;
     public static double FLYWHEEL_TICKS_PER_REV = 28.0;
 
     // =========================================
