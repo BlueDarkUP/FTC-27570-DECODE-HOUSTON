@@ -73,7 +73,7 @@ public class BLUE23close18 extends OpMode {
         kaimenzuo = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(50.000, 80.000),
+                                new Pose(60.000, 83.000),
                                 new Pose(45.000, 61.3000),
                                 new Pose(11.5, 61.5)
                         )
@@ -200,7 +200,7 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 42:
-                if (pathTimer.getElapsedTimeSeconds() >= 2.2) {
+                if (pathTimer.getElapsedTimeSeconds() >= 1.5) {
                     setPathState(50);
                 }
                 break;
