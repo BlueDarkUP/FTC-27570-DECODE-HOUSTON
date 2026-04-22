@@ -117,6 +117,9 @@ public abstract class BaseTeleOp extends LinearOpMode {
 
             double globalVx = odo.getVelX(DistanceUnit.INCH);
             double globalVy = odo.getVelY(DistanceUnit.INCH);
+            if (visionLocalizer != null) {
+                visionLocalizer.updateLimelightOrientation(rawHeadingDeg);
+            }
             boolean currentRightStickButton = gamepad1.right_stick_button;
             visionCalibrationSuccess = false;
 

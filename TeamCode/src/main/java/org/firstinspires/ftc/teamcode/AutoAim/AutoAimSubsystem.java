@@ -21,22 +21,26 @@ public class AutoAimSubsystem {
     private VoltageSensor battery;
     private HardwareMap hardwareMap;
 
-    public static double TURRET_kP = 40.0;
+    public static double TURRET_kP = 33.0;
     public static double TURRET_kI = 0.0;
     public static double TURRET_kD = 0.0;
     public static double TURRET_kF = 0.0;
     public static double TURRET_kV = 0.0012;
-    public static double TURRET_kS = 0.0;
-    public static double TURRET_kA = 0.000115;
+    public static double TURRET_kS = 0.1;
+    public static double TURRET_kA = 0.000109;
     public static double TURRET_LATENCY = 0.012;
     public static double TURRET_MAX_POWER = 1.0;
-    public static double TURRET_FILTER_ALPHA = 0.9;
-    public static double TURRET_VEL_FILTER_ALPHA = 0.9;
+    public static double TURRET_FILTER_ALPHA = 0.8;
+    public static double TURRET_VEL_FILTER_ALPHA = 0.8;
     public static double TURRET_kLinearBraking = 0.008500;
     public static double TURRET_kQuadraticFriction = 0.000098;
     public static double TUNING_VOLTAGE = 13.04;
     public static double CHASSIS_VEL_DEADBAND = 10;
     public static double CHASSIS_VEL_FILTER_ALPHA = 0.8;
+    public static double CHASSIS_ACCEL_FILTER_ALPHA = 0.025;
+    public static double CHASSIS_ACCEL_DEADBAND = 2.0;
+    public static double MAX_CHASSIS_ACCEL = 150.0;
+    public static double TURRET_CMD_ACCEL_FILTER_ALPHA = 0.015;
 
     private PIDFController turretPIDF;
 
@@ -45,6 +49,7 @@ public class AutoAimSubsystem {
     private double lastTurretRelAngle = 0.0;
     private double filteredTurretVel = 0.0;
     private double lastTargetVel = 0.0;
+    private double filteredTargetAccel = 0.0;
     private long lastTime = 0;
     private long lastVoltageReadTime = 0;
     private double currentBatteryVoltage = 12.0;
@@ -52,6 +57,10 @@ public class AutoAimSubsystem {
     private boolean isChassisFilterInitialized = false;
     private double filteredGlobalVx = 0.0;
     private double filteredGlobalVy = 0.0;
+    private double lastGlobalVx = 0.0;
+    private double lastGlobalVy = 0.0;
+    private double filteredAx = 0.0;
+    private double filteredAy = 0.0;
 
     public static class TurretCommand {
         public boolean hasTarget = false;
@@ -127,6 +136,7 @@ public class AutoAimSubsystem {
             lastTurretRelAngle = rawTurretRelAngle;
             filteredTurretVel = 0.0;
             lastTargetVel = 0.0;
+            filteredTargetAccel = 0.0;
             isTurretFilterInitialized = true;
         } else {
             filteredTurretRelAngle = (TURRET_FILTER_ALPHA * rawTurretRelAngle) + ((1.0 - TURRET_FILTER_ALPHA) * filteredTurretRelAngle);
@@ -149,11 +159,12 @@ public class AutoAimSubsystem {
             double pidOutputVel = turretPIDF.calculate(predictedRelAngle, targetTurretRelAngle);
             double finalTargetVel = pidOutputVel;
 
-            double targetAccel = 0.0;
-            if (dt > 0.0001) targetAccel = (finalTargetVel - lastTargetVel) / dt;
+            double rawTargetAccel = 0.0;
+            if (dt > 0.0001) rawTargetAccel = (finalTargetVel - lastTargetVel) / dt;
             lastTargetVel = finalTargetVel;
+            filteredTargetAccel = (TURRET_CMD_ACCEL_FILTER_ALPHA * rawTargetAccel) + ((1.0 - TURRET_CMD_ACCEL_FILTER_ALPHA) * filteredTargetAccel);
 
-            double turretPower = (targetAccel * TURRET_kA)
+            double turretPower = (filteredTargetAccel * TURRET_kA)
                     + (finalTargetVel * TURRET_kV)
                     + (Math.signum(finalTargetVel) * TURRET_kS);
 
@@ -176,14 +187,38 @@ public class AutoAimSubsystem {
         if (!isChassisFilterInitialized) {
             filteredGlobalVx = globalVx;
             filteredGlobalVy = globalVy;
+            lastGlobalVx = globalVx;
+            lastGlobalVy = globalVy;
+            filteredAx = 0.0;
+            filteredAy = 0.0;
             isChassisFilterInitialized = true;
         } else {
+            double rawAx = (dt > 0.0001) ? (globalVx - lastGlobalVx) / dt : 0.0;
+            double rawAy = (dt > 0.0001) ? (globalVy - lastGlobalVy) / dt : 0.0;
+
+            filteredAx = (CHASSIS_ACCEL_FILTER_ALPHA * rawAx) + ((1.0 - CHASSIS_ACCEL_FILTER_ALPHA) * filteredAx);
+            filteredAy = (CHASSIS_ACCEL_FILTER_ALPHA * rawAy) + ((1.0 - CHASSIS_ACCEL_FILTER_ALPHA) * filteredAy);
+
             filteredGlobalVx = (CHASSIS_VEL_FILTER_ALPHA * globalVx) + ((1.0 - CHASSIS_VEL_FILTER_ALPHA) * filteredGlobalVx);
             filteredGlobalVy = (CHASSIS_VEL_FILTER_ALPHA * globalVy) + ((1.0 - CHASSIS_VEL_FILTER_ALPHA) * filteredGlobalVy);
+
+            lastGlobalVx = globalVx;
+            lastGlobalVy = globalVy;
         }
 
         double effectiveVx = isShootOnTheMove ? filteredGlobalVx : 0.0;
         double effectiveVy = isShootOnTheMove ? filteredGlobalVy : 0.0;
+
+        double effectiveAx = 0.0;
+        double effectiveAy = 0.0;
+        if (isShootOnTheMove) {
+            if (Math.abs(filteredAx) > CHASSIS_ACCEL_DEADBAND) {
+                effectiveAx = Math.max(-MAX_CHASSIS_ACCEL, Math.min(MAX_CHASSIS_ACCEL, filteredAx));
+            }
+            if (Math.abs(filteredAy) > CHASSIS_ACCEL_DEADBAND) {
+                effectiveAy = Math.max(-MAX_CHASSIS_ACCEL, Math.min(MAX_CHASSIS_ACCEL, filteredAy));
+            }
+        }
 
         if (isManualMode) {
             double manualRpm = AimCalculator.interpolate(manualDist, 1);
@@ -196,9 +231,8 @@ public class AutoAimSubsystem {
                     AimCalculator.CONSTANT_FLIGHT_TIME;
 
             double totalTime = dynamicFlightTime + AimCalculator.MECHANICAL_SHOOT_DELAY;
-
-            double futureX = robotX + (effectiveVx * totalTime);
-            double futureY = robotY + (effectiveVy * totalTime);
+            double futureX = robotX + (effectiveVx * totalTime) + (0.5 * effectiveAx * totalTime * totalTime);
+            double futureY = robotY + (effectiveVy * totalTime) + (0.5 * effectiveAy * totalTime * totalTime);
             aimResult = AimCalculator.solveAim(futureX, futureY, targetX, targetY, dynamicFlightTime);
         }
 
@@ -253,11 +287,13 @@ public class AutoAimSubsystem {
             double feedforwardVel = -robotAngularVelocityDeg + translationalOmegaDeg;
             double finalTargetVel = pidOutputVel + feedforwardVel;
 
-            double targetAccel = 0.0;
-            if (dt > 0.0001) targetAccel = (finalTargetVel - lastTargetVel) / dt;
+            double rawTargetAccel = 0.0;
+            if (dt > 0.0001) rawTargetAccel = (finalTargetVel - lastTargetVel) / dt;
             lastTargetVel = finalTargetVel;
 
-            double turretPower = (targetAccel * TURRET_kA)
+            filteredTargetAccel = (TURRET_CMD_ACCEL_FILTER_ALPHA * rawTargetAccel) + ((1.0 - TURRET_CMD_ACCEL_FILTER_ALPHA) * filteredTargetAccel);
+
+            double turretPower = (filteredTargetAccel * TURRET_kA)
                     + (finalTargetVel * TURRET_kV)
                     + (Math.signum(finalTargetVel) * TURRET_kS);
 
@@ -271,6 +307,8 @@ public class AutoAimSubsystem {
             TelemetryPacket packet = new TelemetryPacket();
             packet.put("Turret/Error", error);
             packet.put("Turret/IsLocked", command.isAimLocked);
+            packet.put("Predict/AccelX", effectiveAx);
+            packet.put("Predict/AccelY", effectiveAy);
             FtcDashboard.getInstance().sendTelemetryPacket(packet);
 
         } else {
