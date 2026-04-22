@@ -47,6 +47,9 @@ public abstract class BaseTeleOp extends LinearOpMode {
     private boolean lastRightStickButton = false;
     private boolean lastBackState = false;
 
+    private boolean isShootOnTheMove = false;
+    private boolean lastRightBumperState = false;
+
     private double manualTargetDistance = 25.0;
 
     private boolean lastConditionsMet = false;
@@ -157,6 +160,12 @@ public abstract class BaseTeleOp extends LinearOpMode {
                 driveSubsystem.driveFieldCentric(x, y, rx_drive, currentHeadingDeg);
             }
 
+            boolean currentRightBumperState = gamepad1.right_bumper;
+            if (currentRightBumperState && !lastRightBumperState) {
+                isShootOnTheMove = !isShootOnTheMove;
+            }
+            lastRightBumperState = currentRightBumperState;
+
             boolean currentCircleState = gamepad1.b;
             if (currentCircleState && !lastCircleState) {
                 isShootingMode = !isShootingMode;
@@ -179,14 +188,15 @@ public abstract class BaseTeleOp extends LinearOpMode {
                 else if (gamepad1.dpad_down) manualTargetDistance = 150.0;
             }
 
-            boolean isEmergencyBrake = gamepad1.right_bumper || isClimbing;
+            boolean isEmergencyBrake = isClimbing;
+
             double robotOmega = odo.getHeadingVelocity(AngleUnit.DEGREES.getUnnormalized());
 
             AutoAimSubsystem.TurretCommand aimCommand = autoAimSubsystem.update(
                     rx_odo, ry_odo, globalVx, globalVy, rawHeadingDeg, robotOmega,
                     TARGET_X_WORLD, TARGET_Y_WORLD,
                     isManualMode, manualTargetDistance,
-                    isClimbing
+                    isClimbing, isShootOnTheMove
             );
 
             boolean isBBBReady = !isShootingMode || (bbbTimer.milliseconds() >= GlobalConstants.BBB_DELAY_MS);
@@ -242,6 +252,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
 
             telemetry.addData("Mode", isManualMode ? "MANUAL" : "AUTO-AIM");
             telemetry.addData("Shooting Mode", isShootingMode ? "ACTIVE" : "IDLE");
+            telemetry.addData("Shoot-on-the-Move (RB)", isShootOnTheMove ? "ENABLED (跑打开启)" : "DISABLED (静止定点)");
             telemetry.addData("PTO State", climbSubsystem.isPtoUnlocked() ? "UNLOCKED" : "LOCKED");
             telemetry.addData("Calibrate State", visionCalibrationSuccess ? "SUCCESS!" : "Wait for Trigger");
             telemetry.update();

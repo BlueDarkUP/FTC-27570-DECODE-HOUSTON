@@ -119,8 +119,8 @@ public class BLUEclose2gateZUO extends OpMode {
         Path11 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(49.000, 83.000),
-                                new Pose(45.000, 61.3000),
+                                new Pose(60.000, 75.000),
+                                new Pose(42, 60),
                                 new Pose(11.3, 61.4)
                         )
                 )
@@ -179,7 +179,7 @@ public class BLUEclose2gateZUO extends OpMode {
         switch (pathState) {
             case 10:
                 follower.followPath(fasheyuzhi, true);
-                turret.setTargetAngle(-51.5);
+                turret.setTargetAngle(-50.5);
                 flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(11);
@@ -190,7 +190,7 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
             case 12:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(13);
                 }
@@ -227,7 +227,7 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
             case 32:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
                     setPathState(40);
                 }
                 break;
@@ -242,7 +242,7 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
             case 42:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(43);
                 }
@@ -276,7 +276,7 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
             case 62:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.3) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
                     setPathState(70);
                 }
                 break;
@@ -291,7 +291,7 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
             case 72:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(73);
                 }
@@ -319,7 +319,7 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
             case 82:
-                turret.setTargetAngle(-52.5);
+                turret.setTargetAngle(-50.3);
                 if (pathTimer.getElapsedTimeSeconds() >= 1.5) {
                     setPathState(83);
                 }
@@ -335,7 +335,7 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
             case 85:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.3) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(86);
                 }
@@ -369,7 +369,7 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
             case 102:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(103);
                 }

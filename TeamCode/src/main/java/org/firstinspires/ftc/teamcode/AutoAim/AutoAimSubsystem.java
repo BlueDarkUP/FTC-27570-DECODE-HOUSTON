@@ -21,21 +21,21 @@ public class AutoAimSubsystem {
     private VoltageSensor battery;
     private HardwareMap hardwareMap;
 
-    public static double TURRET_kP = 33.0;
+    public static double TURRET_kP = 40.0;
     public static double TURRET_kI = 0.0;
     public static double TURRET_kD = 0.0;
     public static double TURRET_kF = 0.0;
-    public static double TURRET_kV = 0.001201;
+    public static double TURRET_kV = 0.0012;
     public static double TURRET_kS = 0.0;
-    public static double TURRET_kA = 0.000113;
-    public static double TURRET_LATENCY = 0.01;
+    public static double TURRET_kA = 0.000115;
+    public static double TURRET_LATENCY = 0.012;
     public static double TURRET_MAX_POWER = 1.0;
     public static double TURRET_FILTER_ALPHA = 0.9;
     public static double TURRET_VEL_FILTER_ALPHA = 0.9;
     public static double TURRET_kLinearBraking = 0.008500;
     public static double TURRET_kQuadraticFriction = 0.000098;
     public static double TUNING_VOLTAGE = 13.04;
-    public static double CHASSIS_VEL_DEADBAND = 5;
+    public static double CHASSIS_VEL_DEADBAND = 10;
     public static double CHASSIS_VEL_FILTER_ALPHA = 0.8;
 
     private PIDFController turretPIDF;
@@ -98,12 +98,12 @@ public class AutoAimSubsystem {
         LP.setPosition(clampedLP);
         RP.setPosition(calculatedRP);
     }
-
     public TurretCommand update(
             double robotX, double robotY, double globalVx, double globalVy,
             double currentHeadingDeg, double robotAngularVelocityDeg,
             double targetX, double targetY,
-            boolean isManualMode, double manualDist, boolean isClimbing) {
+            boolean isManualMode, double manualDist, boolean isClimbing,
+            boolean isShootOnTheMove) {
 
         turretPIDF.setPIDF(TURRET_kP, TURRET_kI, TURRET_kD, TURRET_kF);
         TurretCommand command = new TurretCommand();
@@ -182,6 +182,9 @@ public class AutoAimSubsystem {
             filteredGlobalVy = (CHASSIS_VEL_FILTER_ALPHA * globalVy) + ((1.0 - CHASSIS_VEL_FILTER_ALPHA) * filteredGlobalVy);
         }
 
+        double effectiveVx = isShootOnTheMove ? filteredGlobalVx : 0.0;
+        double effectiveVy = isShootOnTheMove ? filteredGlobalVy : 0.0;
+
         if (isManualMode) {
             double manualRpm = AimCalculator.interpolate(manualDist, 1);
             double manualPitch = AimCalculator.interpolate(manualDist, 2);
@@ -194,8 +197,8 @@ public class AutoAimSubsystem {
 
             double totalTime = dynamicFlightTime + AimCalculator.MECHANICAL_SHOOT_DELAY;
 
-            double futureX = robotX + (filteredGlobalVx * totalTime);
-            double futureY = robotY + (filteredGlobalVy * totalTime);
+            double futureX = robotX + (effectiveVx * totalTime);
+            double futureY = robotY + (effectiveVy * totalTime);
             aimResult = AimCalculator.solveAim(futureX, futureY, targetX, targetY, dynamicFlightTime);
         }
 
@@ -213,7 +216,7 @@ public class AutoAimSubsystem {
             double distSq = dx * dx + dy * dy;
             double translationalOmegaDeg = 0.0;
             if (distSq > 0.001) {
-                double omegaRad = (-dx * filteredGlobalVy + dy * filteredGlobalVx) / distSq;
+                double omegaRad = (-dx * effectiveVy + dy * effectiveVx) / distSq;
                 translationalOmegaDeg = Math.toDegrees(omegaRad);
             }
 

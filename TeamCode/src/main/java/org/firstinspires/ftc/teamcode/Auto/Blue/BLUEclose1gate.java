@@ -176,7 +176,7 @@ public class BLUEclose1gate extends OpMode {
             case 30:
                 follower.followPath(kaimen, true);
                 intakeShooter.setIntakePower(0.0);
-                turret.setTargetAngle(-50.0);
+                turret.setTargetAngle(-50.5);
                 setPathState(31);
                 break;
             case 31:

@@ -129,7 +129,7 @@ public class BLUE23close18 extends OpMode {
             case 10:
                 flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 follower.followPath(diyigepaoda, true);
-                turret.setTargetAngle(-48.0);
+                turret.setTargetAngle(-47.0);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(11);
                 break;
@@ -165,7 +165,7 @@ public class BLUE23close18 extends OpMode {
 
             case 30:
                 follower.followPath(fashedierpai, true);
-                turret.setTargetAngle(-93.0);
+                turret.setTargetAngle(-92.0);
                 flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(31);
@@ -207,7 +207,7 @@ public class BLUE23close18 extends OpMode {
 
             case 50:
                 follower.followPath(fashekaimenzuo, true);
-                turret.setTargetAngle(-93.0);
+                turret.setTargetAngle(-92.0);
                 flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(1.0);
                 setPathState(51);
@@ -258,7 +258,7 @@ public class BLUE23close18 extends OpMode {
 
             case 80:
                 follower.followPath(fashediyipai, true);
-                turret.setTargetAngle(-93.0);
+                turret.setTargetAngle(-92.0);
                 flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(81);
@@ -301,8 +301,8 @@ public class BLUE23close18 extends OpMode {
 
             case 110:
                 follower.followPath(Returntofixedlaunchpoint, true);
-                turret.setTargetAngle(-26.0);
-                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
+                turret.setTargetAngle(-24.0);
+                flywheel.setTargetRPM(3100);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(111);
                 break;

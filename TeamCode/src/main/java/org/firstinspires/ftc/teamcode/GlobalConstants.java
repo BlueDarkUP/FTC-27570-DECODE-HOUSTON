@@ -29,15 +29,15 @@ public class GlobalConstants {
     // =========================================
     // 3. 俯仰机构 (Pitch)
     // =========================================
-    public static double PITCH_LP_UP = 0.9;
+    public static double PITCH_LP_UP = 1;
     public static double PITCH_LP_DOWN = 0.2;
-    public static double PITCH_RP_UP = 0.0;
+    public static double PITCH_RP_UP = 0.1;
     public static double PITCH_RP_DOWN = 0.7;
 
     public static double PITCH_POS_DEFAULT = 1.0;
-    public static double PITCH_POS_TRANSIT = 0.87;
-    public static double PITCH_POS_INTAKE_NORMAL = 0.75;
-    public static double PITCH_POS_INTAKE_DEEP = 0.70;
+    public static double PITCH_POS_TRANSIT = 0.77;
+    public static double PITCH_POS_INTAKE_NORMAL = 0.65;
+    public static double PITCH_POS_INTAKE_DEEP = 0.6;
 
     // =========================================
     // 4. 拨弹舵机 (BBB)
@@ -55,6 +55,6 @@ public class GlobalConstants {
     public static double AUTO_RPM_FAR = 4700.0;
 
     public static double SHOOT_TIME_LONG = 0.8;
-    public static double SHOOT_TIME_NORMAL = 0.5;
+    public static double SHOOT_TIME_NORMAL = 0.55;
     public static double SHOOT_TIME_SHORT = 0.45;
 }
