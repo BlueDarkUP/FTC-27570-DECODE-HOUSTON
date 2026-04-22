@@ -44,7 +44,6 @@ public abstract class BaseTeleOp extends LinearOpMode {
     private boolean isManualMode = false;
     private boolean lastLeftBumperState = false;
     private boolean lastSquareState = false;
-    private boolean lastRightStickButton = false;
     private boolean lastBackState = false;
 
     private boolean isShootOnTheMove = false;
@@ -54,9 +53,9 @@ public abstract class BaseTeleOp extends LinearOpMode {
 
     private boolean lastConditionsMet = false;
     private long lastRumbleTime = 0;
-    private boolean visionCalibrationSuccess = false;
 
     private ElapsedTime bbbTimer = new ElapsedTime();
+    private ElapsedTime visionUpdateTimer = new ElapsedTime();
 
     @Override
     public void runOpMode() {
@@ -95,7 +94,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
         climbSubsystem = new ClimbSubsystem();
         climbSubsystem.init(hardwareMap);
 
-        telemetry.addLine("Ready to Start - Right Stick to Calibrate XY");
+        telemetry.addLine("Ready to Start");
         telemetry.addData("Alliance Target X", TARGET_X_WORLD);
         telemetry.addData("Alliance Target Y", TARGET_Y_WORLD);
         telemetry.addData("Heading Offset", headingOffset);
@@ -105,6 +104,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
 
         flywheelSubsystem.start();
         intakeSubsystem.start();
+        visionUpdateTimer.reset();
 
         while (opModeIsActive()) {
             odo.update();
@@ -117,32 +117,39 @@ public abstract class BaseTeleOp extends LinearOpMode {
 
             double globalVx = odo.getVelX(DistanceUnit.INCH);
             double globalVy = odo.getVelY(DistanceUnit.INCH);
+
+            double currentSpeed = Math.hypot(globalVx, globalVy);
+
             if (visionLocalizer != null) {
                 visionLocalizer.updateLimelightOrientation(rawHeadingDeg);
             }
-            boolean currentRightStickButton = gamepad1.right_stick_button;
-            visionCalibrationSuccess = false;
 
-            if (currentRightStickButton && !lastRightStickButton && visionLocalizer != null) {
+            boolean isVisionFusing = false;
+
+            if (currentSpeed < 5.0 && visionLocalizer != null) {
                 Pose2D visionPose = visionLocalizer.getTransformedPose(rawHeadingDeg);
-                if (visionPose != null) {
-                    double targetWorldX_Inches = visionPose.getX(DistanceUnit.INCH);
-                    double targetWorldY_Inches = visionPose.getY(DistanceUnit.INCH);
-                    double distToTarget = Math.hypot(TARGET_X_WORLD - rx_odo, TARGET_Y_WORLD - ry_odo);
-                    double clampedDist = Math.max(20.0, Math.min(150.0, distToTarget));
-                    double llWeight = 0.95 - ((clampedDist - 20.0) / (150.0 - 20.0)) * (0.95 - 0.3);
-                    double odoWeight = 1.0 - llWeight;
-                    double fusedX = (rx_odo * odoWeight) + (targetWorldX_Inches * llWeight);
-                    double fusedY = (ry_odo * odoWeight) + (targetWorldY_Inches * llWeight);
 
-                    odo.setPosition(new Pose2D(DistanceUnit.INCH, fusedX, fusedY, AngleUnit.DEGREES, rawHeadingDeg));
-                    gamepad1.rumble(0.5, 0.5, 200);
-                    visionCalibrationSuccess = true;
-                    rx_odo = fusedX;
-                    ry_odo = fusedY;
+                if (visionPose != null) {
+                    isVisionFusing = true;
+
+                    if (visionUpdateTimer.milliseconds() > 100) {
+                        double targetWorldX_Inches = visionPose.getX(DistanceUnit.INCH);
+                        double targetWorldY_Inches = visionPose.getY(DistanceUnit.INCH);
+                        double distToTarget = Math.hypot(TARGET_X_WORLD - rx_odo, TARGET_Y_WORLD - ry_odo);
+                        double clampedDist = Math.max(20.0, Math.min(150.0, distToTarget));
+                        double llWeight = 0.95 - ((clampedDist - 20.0) / (150.0 - 20.0)) * (0.95 - 0.3);
+                        double odoWeight = 1.0 - llWeight;
+                        double fusedX = (rx_odo * odoWeight) + (targetWorldX_Inches * llWeight);
+                        double fusedY = (ry_odo * odoWeight) + (targetWorldY_Inches * llWeight);
+                        odo.setPosition(new Pose2D(DistanceUnit.INCH, fusedX, fusedY, AngleUnit.DEGREES, rawHeadingDeg));
+
+                        rx_odo = fusedX;
+                        ry_odo = fusedY;
+
+                        visionUpdateTimer.reset();
+                    }
                 }
             }
-            lastRightStickButton = currentRightStickButton;
 
             boolean isClimbing = gamepad1.touchpad;
 
@@ -257,7 +264,13 @@ public abstract class BaseTeleOp extends LinearOpMode {
             telemetry.addData("Shooting Mode", isShootingMode ? "ACTIVE" : "IDLE");
             telemetry.addData("Shoot-on-the-Move (RB)", isShootOnTheMove ? "ENABLED (跑打开启)" : "DISABLED (静止定点)");
             telemetry.addData("PTO State", climbSubsystem.isPtoUnlocked() ? "UNLOCKED" : "LOCKED");
-            telemetry.addData("Calibrate State", visionCalibrationSuccess ? "SUCCESS!" : "Wait for Trigger");
+
+            if (currentSpeed >= 15.0) {
+                telemetry.addData("Vision Calib", "PAUSED (Speed > 15 in/s)");
+            } else {
+                telemetry.addData("Vision Calib", isVisionFusing ? "ACTIVE (Auto Fusing)" : "SEARCHING (No Tag)");
+            }
+
             telemetry.update();
         }
 
