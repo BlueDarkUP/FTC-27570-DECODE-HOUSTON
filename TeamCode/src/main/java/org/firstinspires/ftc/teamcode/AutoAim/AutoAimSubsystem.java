@@ -26,7 +26,7 @@ public class AutoAimSubsystem {
     public static double TURRET_kD = 0.0;
     public static double TURRET_kF = 0.0;
     public static double TURRET_kV = 0.0012;
-    public static double TURRET_kS = 0.1;
+    public static double TURRET_kS = 0;
     public static double TURRET_kA = 0.000109;
     public static double TURRET_LATENCY = 0.012;
     public static double TURRET_MAX_POWER = 1.0;
