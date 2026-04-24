@@ -77,20 +77,20 @@ public class ClimbSubsystem {
             updateServos();
         }
 
-        if (climbTimer.milliseconds() >= 300) {
+        if (climbTimer.milliseconds() >= 200) {
             double currentRoll = imu.getRobotYawPitchRollAngles().getRoll(AngleUnit.DEGREES);
             double flP = 0, frP = 0, blP = 0, brP = 0;
 
             if (currentRoll > ROLL_TOLERANCE) {
-                flP = 0.0;  blP = 0.0;
-                frP = 0.75; brP = -0.75;
+                flP = 0.85;  blP = -0.85;
+                frP = 1.0; brP = -1.0;
                 telemetry.addData("Climb Mode", "Leveling: Right Catching Up");
             } else if (currentRoll < -ROLL_TOLERANCE) {
-                flP = 0.75; blP = -0.75;
-                frP = 0.0;  brP = 0.0;
+                flP = 1.0; blP = -1.0;
+                frP = 0.85;  brP = -0.85;
                 telemetry.addData("Climb Mode", "Leveling: Left Catching Up");
             } else {
-                flP = 0.75; frP = 0.75; blP = -0.75; brP = -0.75;
+                flP = 1; frP = 1; blP = -1; brP = -1;
                 telemetry.addData("Climb Mode", "Balanced Climbing");
             }
 

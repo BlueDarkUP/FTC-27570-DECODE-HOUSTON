@@ -36,7 +36,7 @@ public class GlobalConstants {
 
     public static double PITCH_POS_DEFAULT = 1.0;
     public static double PITCH_POS_TRANSIT = 0.77;
-    public static double PITCH_POS_INTAKE_NORMAL = 0.65;
+    public static double PITCH_POS_INTAKE_NORMAL = 0.75;
     public static double PITCH_POS_INTAKE_DEEP = 0.6;
 
     // =========================================

@@ -13,45 +13,44 @@ public class AimCalculator {
     public static double P1_RPM = 2800;
     public static double P1_PITCH = 0;
 
+    public static double P8_DIST = 45.0;
+    public static double P8_RPM = 2900;
+    public static double P8_PITCH = 0.2;
+
     public static double P2_DIST = 60.0;
     public static double P2_RPM = 3000;
     public static double P2_PITCH = 0.65;
 
     public static double P3_DIST = 67.1;
-    public static double P3_RPM = 3200;
+    public static double P3_RPM = 3150;
     public static double P3_PITCH = 0.78;
 
     public static double P4_DIST = 89.2;
-    public static double P4_RPM = 3600;
+    public static double P4_RPM = 3570;
     public static double P4_PITCH = 1.0;
 
-    public static double P5_DIST = 104.6;
-    public static double P5_RPM = 3800;
+    public static double P5_DIST = 98.9;
+    public static double P5_RPM = 3670;
     public static double P5_PITCH = 1.0;
 
     public static double P6_DIST = 122.3;
     public static double P6_RPM = 4000;
     public static double P6_PITCH = 1.0;
 
-    // --- 远射区数据 (Flatline 理念，消除里程计抖动带来的 RPM 震荡) ---
-    public static double P7_DIST = 140.0;
+    public static double P7_DIST = 150.0;
     public static double P7_RPM = 4100;
     public static double P7_PITCH = 1.0;
-
-    public static double P8_DIST = 160.0;
-    public static double P8_RPM = 4100;
-    public static double P8_PITCH = 1.0;
 
     private static double[][] getShootData() {
         return new double[][] {
                 {P1_DIST, P1_RPM, P1_PITCH},
+                {P8_DIST, P8_RPM, P8_PITCH},
                 {P2_DIST, P2_RPM, P2_PITCH},
                 {P3_DIST, P3_RPM, P3_PITCH},
                 {P4_DIST, P4_RPM, P4_PITCH},
                 {P5_DIST, P5_RPM, P5_PITCH},
                 {P6_DIST, P6_RPM, P6_PITCH},
-                {P7_DIST, P7_RPM, P7_PITCH},
-                {P8_DIST, P8_RPM, P8_PITCH}
+                {P7_DIST, P7_RPM, P7_PITCH}
         };
     }
 

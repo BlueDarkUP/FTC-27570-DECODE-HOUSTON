@@ -48,14 +48,13 @@ public abstract class BaseTeleOp extends LinearOpMode {
 
     private boolean isShootOnTheMove = false;
     private boolean lastRightBumperState = false;
-
+    private boolean lastRightStickButtonState = false;
     private double manualTargetDistance = 25.0;
 
     private boolean lastConditionsMet = false;
     private long lastRumbleTime = 0;
 
     private ElapsedTime bbbTimer = new ElapsedTime();
-    private ElapsedTime visionUpdateTimer = new ElapsedTime();
 
     @Override
     public void runOpMode() {
@@ -104,7 +103,6 @@ public abstract class BaseTeleOp extends LinearOpMode {
 
         flywheelSubsystem.start();
         intakeSubsystem.start();
-        visionUpdateTimer.reset();
 
         while (opModeIsActive()) {
             odo.update();
@@ -118,23 +116,22 @@ public abstract class BaseTeleOp extends LinearOpMode {
             double globalVx = odo.getVelX(DistanceUnit.INCH);
             double globalVy = odo.getVelY(DistanceUnit.INCH);
 
-            double currentSpeed = Math.hypot(globalVx, globalVy);
-
             if (visionLocalizer != null) {
                 visionLocalizer.updateLimelightOrientation(rawHeadingDeg);
             }
 
-            boolean isVisionFusing = false;
+            boolean isVisionTargetVisible = false;
+            boolean currentRightStickButton = gamepad1.right_stick_button;
 
-            if (currentSpeed < 5.0 && visionLocalizer != null) {
+            if (visionLocalizer != null) {
                 Pose2D visionPose = visionLocalizer.getTransformedPose(rawHeadingDeg);
 
                 if (visionPose != null) {
-                    isVisionFusing = true;
-
-                    if (visionUpdateTimer.milliseconds() > 100) {
+                    isVisionTargetVisible = true;
+                    if (currentRightStickButton && !lastRightStickButtonState) {
                         double targetWorldX_Inches = visionPose.getX(DistanceUnit.INCH);
                         double targetWorldY_Inches = visionPose.getY(DistanceUnit.INCH);
+
                         double distToTarget = Math.hypot(TARGET_X_WORLD - rx_odo, TARGET_Y_WORLD - ry_odo);
                         double clampedDist = Math.max(20.0, Math.min(150.0, distToTarget));
                         double llWeight = 0.95 - ((clampedDist - 20.0) / (150.0 - 20.0)) * (0.95 - 0.3);
@@ -146,10 +143,11 @@ public abstract class BaseTeleOp extends LinearOpMode {
                         rx_odo = fusedX;
                         ry_odo = fusedY;
 
-                        visionUpdateTimer.reset();
+                        gamepad1.rumble(100);
                     }
                 }
             }
+            lastRightStickButtonState = currentRightStickButton;
 
             boolean isClimbing = gamepad1.touchpad;
 
@@ -199,7 +197,6 @@ public abstract class BaseTeleOp extends LinearOpMode {
             }
 
             boolean isEmergencyBrake = isClimbing;
-
             double robotOmega = odo.getHeadingVelocity(AngleUnit.DEGREES.getUnnormalized());
 
             AutoAimSubsystem.TurretCommand aimCommand = autoAimSubsystem.update(
@@ -214,11 +211,8 @@ public abstract class BaseTeleOp extends LinearOpMode {
 
             if (isEmergencyBrake) {
                 targetVelocityRPM = 0;
-                bbb.setPosition(GlobalConstants.BBB_IDLE_POS);
             } else if (aimCommand.hasTarget) {
                 targetVelocityRPM = aimCommand.targetRpm;
-                if (isShootingMode) bbb.setPosition(GlobalConstants.BBB_SHOOT_POS);
-                else bbb.setPosition(GlobalConstants.BBB_IDLE_POS);
             }
 
             flywheelSubsystem.update(targetVelocityRPM, isEmergencyBrake, aimCommand.hasTarget);
@@ -229,6 +223,26 @@ public abstract class BaseTeleOp extends LinearOpMode {
             }
 
             boolean effectiveAimLocked = isManualMode ? true : aimCommand.isAimLocked;
+            boolean canShoot = false;
+            if (isShootOnTheMove) {
+                canShoot = rpmOK;
+            } else {
+                canShoot = rpmOK && effectiveAimLocked;
+            }
+
+            if (isEmergencyBrake) {
+                bbb.setPosition(GlobalConstants.BBB_IDLE_POS);
+            } else if (aimCommand.hasTarget) {
+                if (isShootingMode && canShoot) {
+                    bbb.setPosition(GlobalConstants.BBB_SHOOT_POS);
+                } else {
+                    bbb.setPosition(GlobalConstants.BBB_IDLE_POS);
+                }
+            } else {
+                bbb.setPosition(GlobalConstants.BBB_IDLE_POS);
+            }
+            boolean actuallyShooting = isShootingMode && canShoot;
+
             boolean conditionsMet = aimCommand.hasTarget && rpmOK && effectiveAimLocked;
 
             if (isShootingMode) {
@@ -247,7 +261,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
             lastConditionsMet = conditionsMet;
 
             intakeSubsystem.update(
-                    isShootingMode,
+                    actuallyShooting,
                     aimCommand.hasTarget,
                     aimCommand.isUnwinding,
                     effectiveAimLocked,
@@ -261,16 +275,18 @@ public abstract class BaseTeleOp extends LinearOpMode {
             );
 
             telemetry.addData("Mode", isManualMode ? "MANUAL" : "AUTO-AIM");
-            telemetry.addData("Shooting Mode", isShootingMode ? "ACTIVE" : "IDLE");
+            telemetry.addData("Shooting Mode", isShootingMode ? "ACTIVE (Button Pressed)" : "IDLE");
+            telemetry.addData("Actually Shooting", actuallyShooting ? "YES (Firing!)" : "BLOCKED (Aim or RPM Not Ready)");
             telemetry.addData("Shoot-on-the-Move (RB)", isShootOnTheMove ? "ENABLED (跑打开启)" : "DISABLED (静止定点)");
-            telemetry.addData("PTO State", climbSubsystem.isPtoUnlocked() ? "UNLOCKED" : "LOCKED");
+            telemetry.addData("Aim Locked", effectiveAimLocked ? "YES" : "NO");
 
-            if (currentSpeed >= 15.0) {
-                telemetry.addData("Vision Calib", "PAUSED (Speed > 15 in/s)");
+            if (isVisionTargetVisible) {
+                telemetry.addData("Vision Calib", "READY (Press Right Stick R3 to Calibrate Once)");
             } else {
-                telemetry.addData("Vision Calib", isVisionFusing ? "ACTIVE (Auto Fusing)" : "SEARCHING (No Tag)");
+                telemetry.addData("Vision Calib", "SEARCHING (No Tag)");
             }
-
+            telemetry.addData("Target Dist", "%.2f inch", aimCommand.targetDist);
+            telemetry.addData("Flywheel RPM", "Target: %.0f | Current: %.0f", aimCommand.targetRpm, flywheelSubsystem.getCurrentRPM());
             telemetry.update();
         }
 

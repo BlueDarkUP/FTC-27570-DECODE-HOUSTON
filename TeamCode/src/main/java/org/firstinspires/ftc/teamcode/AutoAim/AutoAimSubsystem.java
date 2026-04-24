@@ -21,23 +21,23 @@ public class AutoAimSubsystem {
     private VoltageSensor battery;
     private HardwareMap hardwareMap;
 
-    public static double TURRET_kP = 33.0;
+    public static double TURRET_kP = 30.0;
     public static double TURRET_kI = 0.0;
     public static double TURRET_kD = 0.0;
     public static double TURRET_kF = 0.0;
-    public static double TURRET_kV = 0.0012;
+    public static double TURRET_kV = 0.001675;
     public static double TURRET_kS = 0;
-    public static double TURRET_kA = 0.000109;
+    public static double TURRET_kA = 0.000082;
     public static double TURRET_LATENCY = 0.012;
     public static double TURRET_MAX_POWER = 1.0;
     public static double TURRET_FILTER_ALPHA = 0.8;
     public static double TURRET_VEL_FILTER_ALPHA = 0.8;
-    public static double TURRET_kLinearBraking = 0.008500;
-    public static double TURRET_kQuadraticFriction = 0.000098;
-    public static double TUNING_VOLTAGE = 13.04;
+    public static double TURRET_kLinearBraking = 0.003918;
+    public static double TURRET_kQuadraticFriction = 0.000117;
+    public static double TUNING_VOLTAGE = 12.25;
     public static double CHASSIS_VEL_DEADBAND = 10;
     public static double CHASSIS_VEL_FILTER_ALPHA = 0.8;
-    public static double CHASSIS_ACCEL_FILTER_ALPHA = 0.025;
+    public static double CHASSIS_ACCEL_FILTER_ALPHA = 0.001;
     public static double CHASSIS_ACCEL_DEADBAND = 2.0;
     public static double MAX_CHASSIS_ACCEL = 150.0;
     public static double TURRET_CMD_ACCEL_FILTER_ALPHA = 0.015;
@@ -241,9 +241,15 @@ public class AutoAimSubsystem {
             command.targetRpm = aimResult.rpm;
             command.targetPitch = aimResult.pitch;
             command.targetDist = aimResult.dist;
-
-            double calculatedTolerance = 25.0 + (1.5 - 25.0) / (150.0 - 20.0) * (aimResult.dist - 20.0);
-            command.currentTolerance = Math.max(1.5, Math.min(25.0, calculatedTolerance));
+            double calculatedTolerance;
+            if (aimResult.dist <= 20.0) {
+                calculatedTolerance = 30.0;
+            } else if (aimResult.dist >= 90.0) {
+                calculatedTolerance = 5.0;
+            } else {
+                calculatedTolerance = 30.0 + (5.0 - 30.0) / (90.0 - 20.0) * (aimResult.dist - 20.0);
+            }
+            command.currentTolerance = calculatedTolerance;
 
             double dx = targetX - robotX;
             double dy = targetY - robotY;
@@ -306,6 +312,7 @@ public class AutoAimSubsystem {
 
             TelemetryPacket packet = new TelemetryPacket();
             packet.put("Turret/Error", error);
+            packet.put("Turret/Tolerance", command.currentTolerance);
             packet.put("Turret/IsLocked", command.isAimLocked);
             packet.put("Predict/AccelX", effectiveAx);
             packet.put("Predict/AccelY", effectiveAy);
