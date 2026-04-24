@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Auto.Blue;
+package org.firstinspires.ftc.teamcode.Auto.Red;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierCurve;
@@ -13,8 +13,8 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.GlobalConstants;
 import org.firstinspires.ftc.teamcode.Subsystems.ForAuto.*;
 
-@Autonomous(name = "蓝方开门嘬两次自动", group = "Autonomous")
-public class BLUEclose2gateZUO extends OpMode {
+@Autonomous(name = "红方开门嘬两次自动", group = "Autonomous")
+public class REDclose2gateZUO extends OpMode {
 
     private Follower follower;
     private PitchSubsystem pitch;
@@ -40,133 +40,133 @@ public class BLUEclose2gateZUO extends OpMode {
     public PathChain fashedisanpai;
     public PathChain tingkao;
 
-    private final Pose startPose = new Pose(35.000, 135.000, Math.toRadians(180));
+    private final Pose startPose = new Pose(109.000, 135.000, Math.toRadians(0));
 
     public void buildPaths() {
         fasheyuzhi = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(35.000, 135.000),
-                                new Pose(44.000, 84.000)
+                                new Pose(109.000, 135.000),
+                                new Pose(100.000, 84.000)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
+                .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(0))
                 .build();
 
         xidiyipai = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(44.000, 84.000),
-                                new Pose(18.000, 84.000)
+                                new Pose(100.000, 84.000),
+                                new Pose(126.000, 84.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         kaimen = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(18.000, 84.000),
-                                new Pose(20.308, 75.308),
-                                new Pose(17.000, 75.000)
+                                new Pose(126.000, 84.000),
+                                new Pose(123.692, 75.308),
+                                new Pose(127.000, 75.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         fashediyipai = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(17.000, 75.000),
-                                new Pose(60.000, 75.000)
+                                new Pose(127.000, 75.000),
+                                new Pose(84.000, 75.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         kaidiercimen = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(60.000, 75.000),
-                                new Pose(65.000, 58.000),
-                                new Pose(13.000, 58.500)
+                                new Pose(84.000, 75.000),
+                                new Pose(79.000, 58.000),
+                                new Pose(131.000, 58.500)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         Path10 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(13.000, 58.500),
-                                new Pose(36, 61),
-                                new Pose(19, 68)
+                                new Pose(131.000, 58.500),
+                                new Pose(108.000, 61.000),
+                                new Pose(125.000, 68.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         fashedierpai = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(18, 65.077),
-                                new Pose(60.000, 75.000)
+                                new Pose(126.000, 65.077),
+                                new Pose(84.000, 75.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         Path11 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(60.000, 75.000),
-                                new Pose(42, 60),
-                                new Pose(11.3, 60)
+                                new Pose(84.000, 75.000),
+                                new Pose(102.000, 60.000),
+                                new Pose(132.700, 60)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(157))
+                .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(23))
                 .build();
 
         Path12 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(11.3, 60),
-                                new Pose(45.000, 61.3000),
-                                new Pose(60.000, 75.000)
+                                new Pose(132.700, 60),
+                                new Pose(99.000, 61.300),
+                                new Pose(84.000, 75.000)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(157), Math.toRadians(180))
+                .setLinearHeadingInterpolation(Math.toRadians(23), Math.toRadians(0))
                 .build();
 
         xidisanpai = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(60.000, 75.000),
-                                new Pose(65.000, 30.000),
-                                new Pose(13.000, 35.000)
+                                new Pose(84.000, 75.000),
+                                new Pose(79.000, 30.000),
+                                new Pose(131.000, 35.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         fashedisanpai = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(13.000, 35.000),
-                                new Pose(60.000, 75.000)
+                                new Pose(131.000, 35.000),
+                                new Pose(84.000, 75.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         tingkao = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(60.000, 75.000),
-                                new Pose(60.000, 60.000)
+                                new Pose(84.000, 75.000),
+                                new Pose(84.000, 60.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
     }
 
@@ -179,7 +179,7 @@ public class BLUEclose2gateZUO extends OpMode {
         switch (pathState) {
             case 10:
                 follower.followPath(fasheyuzhi, true);
-                turret.setTargetAngle(-50.5);
+                turret.setTargetAngle(50.5);
                 flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(11);
@@ -217,7 +217,7 @@ public class BLUEclose2gateZUO extends OpMode {
                 flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_DOOR_2);
                 follower.followPath(kaimen, false);
                 intakeShooter.setIntakePower(0.0);
-                turret.setTargetAngle(-50.3);
+                turret.setTargetAngle(50.3);
                 setPathState(31);
                 break;
             case 31:
@@ -319,7 +319,7 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
             case 82:
-                turret.setTargetAngle(-50.3);
+                turret.setTargetAngle(50.3);
                 if (pathTimer.getElapsedTimeSeconds() >= 1.5) {
                     setPathState(83);
                 }
@@ -347,7 +347,7 @@ public class BLUEclose2gateZUO extends OpMode {
                 break;
 
             case 90:
-                turret.setTargetAngle(-50.3);
+                turret.setTargetAngle(50.3);
                 follower.followPath(xidisanpai, false);
                 intakeShooter.setIntakePower(1.0);
                 setPathState(91);

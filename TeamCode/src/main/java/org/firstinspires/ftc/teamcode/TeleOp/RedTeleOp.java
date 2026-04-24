@@ -7,7 +7,7 @@ public class RedTeleOp extends BaseTeleOp {
 
     @Override
     protected double getTargetX() {
-        return 136.0;
+        return 135.0;
     }
     @Override
     protected double getTargetY() {

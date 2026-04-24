@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Auto.Blue;
+package org.firstinspires.ftc.teamcode.Auto.Red;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierCurve;
@@ -13,8 +13,8 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.GlobalConstants;
 import org.firstinspires.ftc.teamcode.Subsystems.ForAuto.*;
 
-@Autonomous(name = "蓝方近点18球自动", group = "Autonomous")
-public class BLUE23close18 extends OpMode {
+@Autonomous(name = "红方近点18球自动", group = "Autonomous")
+public class RED23close18 extends OpMode {
 
     private Follower follower;
     private PitchSubsystem pitch;
@@ -41,81 +41,81 @@ public class BLUE23close18 extends OpMode {
     public PathChain xidisanpai;
     public PathChain Returntofixedlaunchpoint;
 
-    private final Pose startPose = new Pose(35.000, 134.600, Math.toRadians(180));
+    private final Pose startPose = new Pose(109.000, 134.600, Math.toRadians(0));
 
     public void buildPaths() {
         diyigepaoda = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(35.000, 135.000),
-                                new Pose(48.000, 86.000)
+                                new Pose(109.000, 135.000),
+                                new Pose(96.000, 86.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         xidierpai = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(48.000, 86.000),
-                                new Pose(60.654, 54.923),
-                                new Pose(13.00, 59)
+                                new Pose(96.000, 86.000),
+                                new Pose(83.346, 54.923),
+                                new Pose(131.000, 59.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         fashedierpai = follower.pathBuilder()
-                .addPath(new BezierCurve(new Pose(11.000, 59.000), new Pose(45.000, 60.000), new Pose(60.000, 83.000)))
-                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(226))
+                .addPath(new BezierCurve(new Pose(133.000, 59.000), new Pose(99.000, 60.000), new Pose(84.000, 83.000)))
+                .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-46))
                 .build();
 
         kaimenzuo = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(60.000, 83.000),
-                                new Pose(45.000, 61.3000),
-                                new Pose(11.5, 60)
+                                new Pose(84.000, 83.000),
+                                new Pose(99.000, 61.3000),
+                                new Pose(132.500, 60)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(157))
+                .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(23))
                 .build();
 
         fashekaimenzuo = follower.pathBuilder()
-                .addPath(new BezierCurve(new Pose(11.5, 60), new Pose(35.000, 47.000), new Pose(60.000, 83.000)))
-                .setLinearHeadingInterpolation(Math.toRadians(157), Math.toRadians(226))
+                .addPath(new BezierCurve(new Pose(132.500, 60), new Pose(109.000, 47.000), new Pose(84.000, 83.000)))
+                .setLinearHeadingInterpolation(Math.toRadians(23), Math.toRadians(-46))
                 .build();
 
         zhunbeixidiyipai = follower.pathBuilder()
-                .addPath(new BezierLine(new Pose(60.000, 83.000), new Pose(45.000, 83.000)))
-                .setLinearHeadingInterpolation(Math.toRadians(226), Math.toRadians(180))
+                .addPath(new BezierLine(new Pose(84.000, 83.000), new Pose(99.000, 83.000)))
+                .setLinearHeadingInterpolation(Math.toRadians(-46), Math.toRadians(0))
                 .setNoDeceleration()
                 .build();
 
         xidiyipai = follower.pathBuilder()
-                .addPath(new BezierLine(new Pose(45.000, 83.000), new Pose(19.000, 83.000)))
+                .addPath(new BezierLine(new Pose(99.000, 83.000), new Pose(125.000, 83.000)))
                 .setTangentHeadingInterpolation()
                 .build();
 
         fashediyipai = follower.pathBuilder()
-                .addPath(new BezierLine(new Pose(19.000, 83.000), new Pose(60.000, 83.000)))
-                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(230))
+                .addPath(new BezierLine(new Pose(125.000, 83.000), new Pose(84.000, 83.000)))
+                .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(-50))
                 .build();
 
         zhunbeixidisanpai = follower.pathBuilder()
-                .addPath(new BezierLine(new Pose(60.000, 83.000), new Pose(50.000, 36.000)))
-                .setLinearHeadingInterpolation(Math.toRadians(230), Math.toRadians(180))
+                .addPath(new BezierLine(new Pose(84.000, 83.000), new Pose(94.000, 36.000)))
+                .setLinearHeadingInterpolation(Math.toRadians(-50), Math.toRadians(0))
                 .setNoDeceleration()
                 .build();
 
         xidisanpai = follower.pathBuilder()
-                .addPath(new BezierLine(new Pose(50.000, 36.000), new Pose(12.000, 36.000)))
+                .addPath(new BezierLine(new Pose(94.000, 36.000), new Pose(132.000, 36.000)))
                 .setTangentHeadingInterpolation()
                 .build();
 
         Returntofixedlaunchpoint = follower.pathBuilder()
-                .addPath(new BezierLine(new Pose(13.000, 35.800), new Pose(59.923, 107.923)))
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .addPath(new BezierLine(new Pose(131.000, 35.800), new Pose(84.077, 107.923)))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
     }
 
@@ -129,7 +129,7 @@ public class BLUE23close18 extends OpMode {
             case 10:
                 flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 follower.followPath(diyigepaoda, true);
-                turret.setTargetAngle(-47.0);
+                turret.setTargetAngle(46.0);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(11);
                 break;
@@ -152,7 +152,7 @@ public class BLUE23close18 extends OpMode {
                 break;
 
             case 20:
-                follower.setMaxPower(1);
+                follower.setMaxPower(0.85);
                 follower.followPath(xidierpai, false);
                 intakeShooter.setBBServo(GlobalConstants.BBB_IDLE_POS);
                 intakeShooter.setIntakePower(1.0);
@@ -164,8 +164,9 @@ public class BLUE23close18 extends OpMode {
                 break;
 
             case 30:
+                follower.setMaxPower(1);
                 follower.followPath(fashedierpai, true);
-                turret.setTargetAngle(-92.0);
+                turret.setTargetAngle(94.0);
                 flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(31);
@@ -176,7 +177,7 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 315:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(32);
                 }
@@ -200,14 +201,14 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 42:
-                if (pathTimer.getElapsedTimeSeconds() >= 1.5) {
+                if (pathTimer.getElapsedTimeSeconds() >= 1) {
                     setPathState(50);
                 }
                 break;
 
             case 50:
                 follower.followPath(fashekaimenzuo, true);
-                turret.setTargetAngle(-92.0);
+                turret.setTargetAngle(90.0);
                 flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(1.0);
                 setPathState(51);
@@ -218,7 +219,7 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 515:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.4) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(52);
                 }
@@ -258,7 +259,7 @@ public class BLUE23close18 extends OpMode {
 
             case 80:
                 follower.followPath(fashediyipai, true);
-                turret.setTargetAngle(-92.0);
+                turret.setTargetAngle(90.0);
                 flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(81);
@@ -269,7 +270,7 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 815:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(82);
                 }
@@ -301,8 +302,8 @@ public class BLUE23close18 extends OpMode {
 
             case 110:
                 follower.followPath(Returntofixedlaunchpoint, true);
-                turret.setTargetAngle(-25.0);
-                flywheel.setTargetRPM(3100);
+                turret.setTargetAngle(24.0);
+                flywheel.setTargetRPM(3050);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(111);
                 break;
@@ -312,7 +313,7 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 1115:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(112);
                 }

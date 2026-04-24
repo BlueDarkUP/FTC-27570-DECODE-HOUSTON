@@ -25,22 +25,23 @@ public class AutoAimSubsystem {
     public static double TURRET_kI = 0.0;
     public static double TURRET_kD = 0.0;
     public static double TURRET_kF = 0.0;
-    public static double TURRET_kV = 0.001675;
-    public static double TURRET_kS = 0;
-    public static double TURRET_kA = 0.000082;
+    public static double TURRET_kV = 0.001420;
+    public static double TURRET_kS = 0.03;
+    public static double TURRET_kA = 0.000083;
     public static double TURRET_LATENCY = 0.012;
     public static double TURRET_MAX_POWER = 1.0;
     public static double TURRET_FILTER_ALPHA = 0.8;
     public static double TURRET_VEL_FILTER_ALPHA = 0.8;
-    public static double TURRET_kLinearBraking = 0.003918;
-    public static double TURRET_kQuadraticFriction = 0.000117;
-    public static double TUNING_VOLTAGE = 12.25;
+    public static double TURRET_CMD_ACCEL_FILTER_ALPHA = 0.15;
+
+    public static double TURRET_kLinearBraking = 0.018677;
+    public static double TURRET_kQuadraticFriction = 0.000101;
+    public static double TUNING_VOLTAGE = 13.38;
     public static double CHASSIS_VEL_DEADBAND = 10;
     public static double CHASSIS_VEL_FILTER_ALPHA = 0.8;
     public static double CHASSIS_ACCEL_FILTER_ALPHA = 0.001;
     public static double CHASSIS_ACCEL_DEADBAND = 2.0;
     public static double MAX_CHASSIS_ACCEL = 150.0;
-    public static double TURRET_CMD_ACCEL_FILTER_ALPHA = 0.015;
 
     private PIDFController turretPIDF;
 
@@ -53,6 +54,7 @@ public class AutoAimSubsystem {
     private long lastTime = 0;
     private long lastVoltageReadTime = 0;
     private double currentBatteryVoltage = 12.0;
+    private boolean isCurrentlyUnwinding = false;
 
     private boolean isChassisFilterInitialized = false;
     private double filteredGlobalVx = 0.0;
@@ -164,9 +166,10 @@ public class AutoAimSubsystem {
             lastTargetVel = finalTargetVel;
             filteredTargetAccel = (TURRET_CMD_ACCEL_FILTER_ALPHA * rawTargetAccel) + ((1.0 - TURRET_CMD_ACCEL_FILTER_ALPHA) * filteredTargetAccel);
 
+            double ksSign = Math.abs(finalTargetVel) > 0.5 ? Math.signum(finalTargetVel) : 0.0;
             double turretPower = (filteredTargetAccel * TURRET_kA)
                     + (finalTargetVel * TURRET_kV)
-                    + (Math.signum(finalTargetVel) * TURRET_kS);
+                    + (ksSign * TURRET_kS);
 
             double voltageCompensationRatio = TUNING_VOLTAGE / currentBatteryVoltage;
             turretPower *= voltageCompensationRatio;
@@ -271,13 +274,18 @@ public class AutoAimSubsystem {
 
             if (targetTurretRelAngle > 175.0) {
                 targetTurretRelAngle -= 360.0;
-                command.isUnwinding = true;
+                isCurrentlyUnwinding = true;
             } else if (targetTurretRelAngle < -210.0) {
                 targetTurretRelAngle += 360.0;
-                command.isUnwinding = true;
-            } else {
-                command.isUnwinding = false;
+                isCurrentlyUnwinding = true;
             }
+
+            if (isCurrentlyUnwinding) {
+                if (Math.abs(targetTurretRelAngle - filteredTurretRelAngle) < 15.0 && Math.abs(filteredTurretVel) < 20.0) {
+                    isCurrentlyUnwinding = false;
+                }
+            }
+            command.isUnwinding = isCurrentlyUnwinding;
 
             command.isAimLocked = Math.abs(error) <= command.currentTolerance;
 
@@ -299,9 +307,10 @@ public class AutoAimSubsystem {
 
             filteredTargetAccel = (TURRET_CMD_ACCEL_FILTER_ALPHA * rawTargetAccel) + ((1.0 - TURRET_CMD_ACCEL_FILTER_ALPHA) * filteredTargetAccel);
 
+            double ksSign = Math.abs(finalTargetVel) > 0.5 ? Math.signum(finalTargetVel) : 0.0;
             double turretPower = (filteredTargetAccel * TURRET_kA)
                     + (finalTargetVel * TURRET_kV)
-                    + (Math.signum(finalTargetVel) * TURRET_kS);
+                    + (ksSign * TURRET_kS);
 
             double voltageCompensationRatio = TUNING_VOLTAGE / currentBatteryVoltage;
             turretPower *= voltageCompensationRatio;
@@ -328,5 +337,6 @@ public class AutoAimSubsystem {
         Turret.setPower(0);
         isTurretFilterInitialized = false;
         isChassisFilterInitialized = false;
+        isCurrentlyUnwinding = false;
     }
 }

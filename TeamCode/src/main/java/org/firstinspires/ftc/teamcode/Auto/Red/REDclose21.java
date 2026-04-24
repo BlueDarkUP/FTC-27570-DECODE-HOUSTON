@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Auto.Blue;
+package org.firstinspires.ftc.teamcode.Auto.Red;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierCurve;
@@ -14,8 +14,8 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 // 引入你的子系统包
 import org.firstinspires.ftc.teamcode.Subsystems.ForAuto.*;
 
-@Autonomous(name = "蓝方21球自动", group = "Autonomous")
-public class BLUEclose21 extends OpMode {
+@Autonomous(name = "红方21球自动", group = "Autonomous")
+public class REDclose21 extends OpMode {
 
     // 底盘跟随器
     private Follower follower;
@@ -45,151 +45,151 @@ public class BLUEclose21 extends OpMode {
     public PathChain huiqufashe6;
 
     // 起始点基于你提供的新路线第一段
-    private final Pose startPose = new Pose(35.000, 135.000, Math.toRadians(180));
+    private final Pose startPose = new Pose(109.000, 135.000, Math.toRadians(0));
 
     public void buildPaths() {
         fasheyuzhi = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(35.000, 135.000),
-                                new Pose(48.000, 86.000)
+                                new Pose(109.000, 135.000),
+                                new Pose(96.000, 86.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         xidierpai = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(48.000, 86.000),
-                                new Pose(60.654, 54.923),
-                                new Pose(13.00, 59)
+                                new Pose(96.000, 86.000),
+                                new Pose(83.346, 54.923),
+                                new Pose(131.00, 59.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         huiqufashe1 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(13.00, 58.30),
-                                new Pose(45.000, 61.3000),
-                                new Pose(50.000, 80.000)
+                                new Pose(131.00, 58.30),
+                                new Pose(99.000, 61.3000),
+                                new Pose(94.000, 80.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         //TODO:TTT
-        double kaimenzuox = 11.1;
+        double kaimenzuox = 132.7;
         double kaimenzuoy = 60.3;
 
         kaimenzuo1 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(50.000, 80.000),
-                                new Pose(45.000, 61.3000),
-                                new Pose(kaimenzuox, kaimenzuoy)
+                                new Pose(94.000, 80.000),
+                                new Pose(99.000, 61.3000),
+                                new Pose(kaimenzuox, 60)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(156))
+                .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(24))
                 .build();
 
         huiqufashe2 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
                                 new Pose(kaimenzuox, kaimenzuoy),
-                                new Pose(45.000, 61.3000),
-                                new Pose(49.000, 83.000)
+                                new Pose(99.000, 61.3000),
+                                new Pose(95.000, 83.000)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(156), Math.toRadians(180))
+                .setLinearHeadingInterpolation(Math.toRadians(24), Math.toRadians(0))
                 .build();
 
         kaimenzuo2 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(49.000, 83.000),
-                                new Pose(45.000, 61.3000),
+                                new Pose(95.000, 83.000),
+                                new Pose(99.000, 61.3000),
                                 new Pose(kaimenzuox, kaimenzuoy)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(156))
+                .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(24))
                 .build();
 
         huiqufashe3 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
                                 new Pose(kaimenzuox, kaimenzuoy),
-                                new Pose(45.000, 61.3000),
-                                new Pose(49.000, 83.000)
+                                new Pose(99.000, 61.3000),
+                                new Pose(95.000, 83.000)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(156), Math.toRadians(180))
+                .setLinearHeadingInterpolation(Math.toRadians(24), Math.toRadians(0))
                 .build();
 
         xidiyipai = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(49.000, 83.000),
-                                new Pose(19.000, 83.000)
+                                new Pose(95.000, 83.000),
+                                new Pose(125.000, 83.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         huiqufashe4 = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(19.000, 83.000),
-                                new Pose(50.000, 80.000)
+                                new Pose(125.000, 83.000),
+                                new Pose(94.000, 80.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(180))
+                .setConstantHeadingInterpolation(Math.toRadians(0))
                 .build();
 
         kaimenzuo3 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(50.000, 80.000),
-                                new Pose(45.000, 61.3000),
+                                new Pose(94.000, 80.000),
+                                new Pose(99.000, 61.3000),
                                 new Pose(kaimenzuox, kaimenzuoy)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(156))
+                .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(24))
                 .build();
 
         huiqufashe5 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
                                 new Pose(kaimenzuox, kaimenzuoy),
-                                new Pose(45.000, 61.3000),
-                                new Pose(49.000, 83.000)
+                                new Pose(99.000, 61.3000),
+                                new Pose(95.000, 83.000)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(156), Math.toRadians(180))
+                .setLinearHeadingInterpolation(Math.toRadians(24), Math.toRadians(0))
                 .build();
 
         kaimenzuo4 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(49.000, 83.000),
-                                new Pose(45.000, 61.3000),
+                                new Pose(95.000, 83.000),
+                                new Pose(99.000, 61.3000),
                                 new Pose(kaimenzuox, kaimenzuoy)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(156))
+                .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(24))
                 .build();
 
         huiqufashe6 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
                                 new Pose(kaimenzuox, kaimenzuoy),
-                                new Pose(45.000, 61.3000),
-                                new Pose(58, 100.000)
+                                new Pose(99.000, 61.3000),
+                                new Pose(86.000, 100.000)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(156), Math.toRadians(135))
+                .setLinearHeadingInterpolation(Math.toRadians(24), Math.toRadians(45))
                 .build();
     }
 
@@ -205,7 +205,7 @@ public class BLUEclose21 extends OpMode {
                 // 修改：将跑打(false)改为停靠(true)
                 flywheel.setTargetRPM(3250);
                 follower.followPath(fasheyuzhi, true);
-                turret.setTargetAngle(-48.0);
+                turret.setTargetAngle(48.0);
                 // 修改：目标转速设为3600
                 intakeShooter.setIntakePower(0.0);
                 setPathState(11);
@@ -219,7 +219,7 @@ public class BLUEclose21 extends OpMode {
             case 115:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
                     // 使用精射模式（停靠射击）发射0.5秒
-                    intakeShooter.startPrecisionShoot(0.47);
+                    intakeShooter.startPrecisionShoot(0.4);
                     setPathState(12);
                 }
                 break;
@@ -238,7 +238,7 @@ public class BLUEclose21 extends OpMode {
                 follower.followPath(xidierpai, false);
                 intakeShooter.setBBServo(0.0);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3250.0); // 提前准备后续RPM
+                flywheel.setTargetRPM(3200); // 提前准备后续RPM
                 setPathState(21);
                 break;
             case 21:
@@ -249,8 +249,8 @@ public class BLUEclose21 extends OpMode {
             case 30:
                 follower.setMaxPower(0.9);
                 follower.followPath(huiqufashe1, true);
-                turret.setTargetAngle(-53.0);
-                flywheel.setTargetRPM(3250.0);
+                turret.setTargetAngle(53.0);
+                flywheel.setTargetRPM(3200);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(31);
                 break;
@@ -273,7 +273,7 @@ public class BLUEclose21 extends OpMode {
                 follower.setMaxPower(1);
                 follower.followPath(kaimenzuo1, true);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(3200);
                 setPathState(41);
                 break;
             case 41:
@@ -282,7 +282,7 @@ public class BLUEclose21 extends OpMode {
                 }
                 break;
             case 42:
-                if (pathTimer.getElapsedTimeSeconds() >= 1.1) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.6) {
                     setPathState(50);
                 }
                 break;
@@ -290,8 +290,8 @@ public class BLUEclose21 extends OpMode {
             // ================== 第5阶段：发射（第1次开门后）==================
             case 50:
                 follower.followPath(huiqufashe2, true);
-                turret.setTargetAngle(-53.0);
-                flywheel.setTargetRPM(3250.0);
+                turret.setTargetAngle(53.0);
+                flywheel.setTargetRPM(3200);
                 intakeShooter.setIntakePower(1.0); // 发射同时可以保持吸
                 setPathState(51);
                 break;
@@ -302,7 +302,7 @@ public class BLUEclose21 extends OpMode {
                 break;
             case 515:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
-                    intakeShooter.startPrecisionShoot(0.52);
+                    intakeShooter.startPrecisionShoot(0.5);
                     setPathState(52);
                 }
                 break;
@@ -313,7 +313,7 @@ public class BLUEclose21 extends OpMode {
             case 60:
                 follower.followPath(kaimenzuo2, true);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(3200);
                 setPathState(61);
                 break;
             case 61:
@@ -322,7 +322,7 @@ public class BLUEclose21 extends OpMode {
                 }
                 break;
             case 62:
-                if (pathTimer.getElapsedTimeSeconds() >= 1.6) {
+                if (pathTimer.getElapsedTimeSeconds() >= 1.1) {
                     setPathState(70);
                 }
                 break;
@@ -330,8 +330,8 @@ public class BLUEclose21 extends OpMode {
             // ================== 第7阶段：发射（第2次开门后）==================
             case 70:
                 follower.followPath(huiqufashe3, true);
-                turret.setTargetAngle(-53.0);
-                flywheel.setTargetRPM(3250.0);
+                turret.setTargetAngle(56.0);
+                flywheel.setTargetRPM(3200);
                 intakeShooter.setIntakePower(1.0);
                 setPathState(71);
                 break;
@@ -342,7 +342,7 @@ public class BLUEclose21 extends OpMode {
                 break;
             case 715:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
-                    intakeShooter.startPrecisionShoot(0.52);
+                    intakeShooter.startPrecisionShoot(0.5);
                     setPathState(72);
                 }
                 break;
@@ -354,7 +354,7 @@ public class BLUEclose21 extends OpMode {
             case 80:
                 follower.followPath(xidiyipai, false);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(3200);
                 setPathState(81);
                 break;
             case 81:
@@ -364,8 +364,8 @@ public class BLUEclose21 extends OpMode {
             // ================== 第9阶段：发射（吸完第一排后）==================
             case 90:
                 follower.followPath(huiqufashe4, true);
-                turret.setTargetAngle(-53.0);
-                flywheel.setTargetRPM(3250.0);
+                turret.setTargetAngle(52.0);
+                flywheel.setTargetRPM(3200);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(91);
                 break;
@@ -387,7 +387,7 @@ public class BLUEclose21 extends OpMode {
             case 100:
                 follower.followPath(kaimenzuo3, true);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(3200);
                 setPathState(101);
                 break;
             case 101:
@@ -396,7 +396,7 @@ public class BLUEclose21 extends OpMode {
                 }
                 break;
             case 102:
-                if (pathTimer.getElapsedTimeSeconds() >= 1.1) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.6) {
                     setPathState(110);
                 }
                 break;
@@ -404,8 +404,8 @@ public class BLUEclose21 extends OpMode {
             // ================== 第11阶段：发射（第3次开门后）==================
             case 110:
                 follower.followPath(huiqufashe5, true);
-                turret.setTargetAngle(-53.0);
-                flywheel.setTargetRPM(3250.0);
+                turret.setTargetAngle(55.0);
+                flywheel.setTargetRPM(3200);
                 intakeShooter.setIntakePower(1.0);
                 setPathState(111);
                 break;
@@ -429,7 +429,7 @@ public class BLUEclose21 extends OpMode {
                 follower.followPath(kaimenzuo4, true);
                 intakeShooter.setIntakePower(1.0);
 
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(3200);
 
                 setPathState(121);
                 break;
@@ -439,7 +439,7 @@ public class BLUEclose21 extends OpMode {
                 }
                 break;
             case 122:
-                if (pathTimer.getElapsedTimeSeconds() >= 1.6) {
+                if (pathTimer.getElapsedTimeSeconds() >= 1.1) {
                     setPathState(130);
                 }
                 break;
@@ -447,7 +447,7 @@ public class BLUEclose21 extends OpMode {
             // ================== 第13阶段：最后一次停靠并发射 ==================
             case 130:
                 follower.followPath(huiqufashe6, true);
-                turret.setTargetAngle(9); // 只有最后一次云台角度是 -27.0
+                turret.setTargetAngle(-9.0); // 只有最后一次云台角度是 -27.0 的取反
                 flywheel.setTargetRPM(3100.0);
                 pitch.setPitch(0.9);
                 intakeShooter.setIntakePower(0.0);
@@ -460,7 +460,7 @@ public class BLUEclose21 extends OpMode {
                 break;
             case 1315:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
-                    intakeShooter.startPrecisionShoot(0.5);
+                    intakeShooter.startPrecisionShoot(0.52);
                     setPathState(132);
                 }
                 break;

@@ -25,13 +25,13 @@ public class Constants {
             .lateralZeroPowerAcceleration(-52.88478403)
             //HEADING PIDF
             .headingPIDFCoefficients(new PIDFCoefficients(0.7, 0, 0.01, 0.1))
-            .secondaryHeadingPIDFCoefficients(new PIDFCoefficients(1.25,0.001,0.02,0))
+            .secondaryHeadingPIDFCoefficients(new PIDFCoefficients(1.5,0.001,0.02,0))
 
             .translationalPIDFCoefficients(new PIDFCoefficients(0.25, 0, 0.001, 0.1))
-            .secondaryTranslationalPIDFCoefficients(new PIDFCoefficients(0.13,0,0.001,0))
+            .secondaryTranslationalPIDFCoefficients(new PIDFCoefficients(0.13,0,0.01,0))
 
-            .drivePIDFCoefficients(new FilteredPIDFCoefficients(0.02,0.0,0.0008,0.6,0.1))
-            .secondaryDrivePIDFCoefficients(new FilteredPIDFCoefficients(0.01,0,0.0008,0.6,0.01))
+            .drivePIDFCoefficients(new FilteredPIDFCoefficients(0.02,0.0,0.001,0.6,0.1))
+            .secondaryDrivePIDFCoefficients(new FilteredPIDFCoefficients(0.01,0,0.001,0.6,0.01))
             ;
     public static MecanumConstants driveConstants = new MecanumConstants()
             .maxPower(1)
@@ -43,7 +43,7 @@ public class Constants {
             .leftRearMotorDirection(DcMotorSimple.Direction.REVERSE)
             .rightFrontMotorDirection(DcMotorSimple.Direction.FORWARD)
             .rightRearMotorDirection(DcMotorSimple.Direction.FORWARD)
-            .xVelocity(91)
+            .xVelocity(94)
             .yVelocity(70)
             ;
     public static PinpointConstants localizerConstants = new PinpointConstants()
