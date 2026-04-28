@@ -138,7 +138,7 @@ public class AutoAimSubsystem {
             double currentHeadingDeg, double robotAngularVelocityDeg,
             double targetX, double targetY,
             boolean isManualMode, double manualDist, boolean isClimbing,
-            boolean isShootOnTheMove, boolean isBraking) {
+            boolean isShootOnTheMove, boolean isBraking, double yawOffset) {
 
         turretPIDF.setPIDF(TURRET_kP, TURRET_kI, TURRET_kD, TURRET_kF);
         TurretCommand command = new TurretCommand();
@@ -313,8 +313,7 @@ public class AutoAimSubsystem {
                 double omegaRad = (-dx * effectiveFieldVy + dy * effectiveFieldVx) / distSq;
                 translationalOmegaDeg = Math.toDegrees(omegaRad);
             }
-
-            double compensatedTargetAbsAngle = aimResult.algYaw + (translationalOmegaDeg * TURRET_LATENCY);
+            double compensatedTargetAbsAngle = aimResult.algYaw + yawOffset + (translationalOmegaDeg * TURRET_LATENCY);
             double currentTurretAbsAngle = smoothHeading + filteredTurretRelAngle;
             double error = compensatedTargetAbsAngle - currentTurretAbsAngle;
 
@@ -372,6 +371,7 @@ public class AutoAimSubsystem {
             TelemetryPacket packet = new TelemetryPacket();
             packet.put("Turret/Error", error);
             packet.put("Turret/Tolerance", command.currentTolerance);
+            packet.put("Turret/YawOffset", yawOffset);
             packet.put("Turret/IsLocked", command.isAimLocked);
             packet.put("Predict/Braking", isBraking);
             packet.put("Predict/FilteredForward", filteredForward);

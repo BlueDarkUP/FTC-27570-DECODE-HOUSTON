@@ -49,8 +49,12 @@ public abstract class BaseTeleOp extends LinearOpMode {
 
     private boolean isShootOnTheMove = false;
     private boolean lastRightBumperState = false;
-    private boolean lastRightStickButtonState = false;
+    private boolean lastG2RightStickButtonState = false;
+    private boolean lastG2LeftBumperState = false;
+    private boolean lastG2RightBumperState = false;
+    private boolean lastG2SquareState = false;
     private double manualTargetDistance = 25.0;
+    private double manualYawOffset = 0.0;
     private static final double BRAKE_STICK_THRESHOLD = 0.15;
 
     private boolean lastConditionsMet = false;
@@ -128,14 +132,13 @@ public abstract class BaseTeleOp extends LinearOpMode {
             }
 
             boolean isVisionTargetVisible = false;
-            boolean currentRightStickButton = gamepad1.right_stick_button;
-
+            boolean currentG2RightStickButton = gamepad2.right_stick_button;
             if (visionLocalizer != null) {
                 Pose2D visionPose = visionLocalizer.getTransformedPose(rawHeadingDeg);
 
                 if (visionPose != null) {
                     isVisionTargetVisible = true;
-                    if (currentRightStickButton && !lastRightStickButtonState) {
+                    if (currentG2RightStickButton && !lastG2RightStickButtonState) {
                         double targetWorldX_Inches = visionPose.getX(DistanceUnit.INCH);
                         double targetWorldY_Inches = visionPose.getY(DistanceUnit.INCH);
 
@@ -150,11 +153,30 @@ public abstract class BaseTeleOp extends LinearOpMode {
                         rx_odo = fusedX;
                         ry_odo = fusedY;
 
-                        gamepad1.rumble(100);
+                        gamepad2.rumble(100);
                     }
                 }
             }
-            lastRightStickButtonState = currentRightStickButton;
+            lastG2RightStickButtonState = currentG2RightStickButton;
+
+            boolean currentG2LeftBumper = gamepad2.left_bumper;
+            boolean currentG2RightBumper = gamepad2.right_bumper;
+            boolean currentG2Square = gamepad2.x;
+
+            if (currentG2LeftBumper && !lastG2LeftBumperState) {
+                manualYawOffset += 0.3;
+            }
+            if (currentG2RightBumper && !lastG2RightBumperState) {
+                manualYawOffset -= 0.3;
+            }
+            if (currentG2Square && !lastG2SquareState) {
+                manualYawOffset = 0.0;
+            }
+
+            lastG2LeftBumperState = currentG2LeftBumper;
+            lastG2RightBumperState = currentG2RightBumper;
+            lastG2SquareState = currentG2Square;
+
 
             boolean isClimbing = gamepad1.touchpad;
 
@@ -212,7 +234,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
                     rx_odo, ry_odo, globalVx, globalVy, rawHeadingDeg, robotOmega,
                     TARGET_X_WORLD, TARGET_Y_WORLD,
                     isManualMode, manualTargetDistance,
-                    isClimbing, isShootOnTheMove, isBraking
+                    isClimbing, isShootOnTheMove, isBraking, manualYawOffset
             );
 
             boolean isBBBReady = !isShootingMode || (bbbTimer.milliseconds() >= GlobalConstants.BBB_DELAY_MS);
@@ -284,6 +306,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
             );
 
             telemetry.addData("Mode", isManualMode ? "MANUAL" : "AUTO-AIM");
+            telemetry.addData("Yaw Tuning Offset (G2)", "%.1f deg (Press G2 X to reset)", manualYawOffset);
             telemetry.addData("Shooting Mode", isShootingMode ? "ACTIVE (Button Pressed)" : "IDLE");
             telemetry.addData("Actually Shooting", actuallyShooting ? "YES (Firing!)" : "BLOCKED (Aim or RPM Not Ready)");
             telemetry.addData("Shoot-on-the-Move (RB)", isShootOnTheMove ? "ENABLED (跑打开启)" : "DISABLED (静止定点)");
@@ -291,9 +314,9 @@ public abstract class BaseTeleOp extends LinearOpMode {
             telemetry.addData("Braking Detected", isBraking ? "YES (Override Active)" : "NO");
 
             if (isVisionTargetVisible) {
-                telemetry.addData("Vision Calib", "READY (Press Right Stick R3 to Calibrate Once)");
+                telemetry.addData("Vision Calib (G2)", "READY (Press G2 R3 to Calibrate Once)");
             } else {
-                telemetry.addData("Vision Calib", "SEARCHING (No Tag)");
+                telemetry.addData("Vision Calib (G2)", "SEARCHING (No Tag)");
             }
             telemetry.addData("Target Dist", "%.2f inch", aimCommand.targetDist);
             telemetry.addData("Flywheel RPM", "Target: %.0f | Current: %.0f", aimCommand.targetRpm, flywheelSubsystem.getCurrentRPM());
