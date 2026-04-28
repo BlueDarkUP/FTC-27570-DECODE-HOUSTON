@@ -22,7 +22,7 @@ public class TurretFullAutoTuner extends OpMode {
     private DcMotorEx Turret;
 
     public static double MAX_SAFE_ANGLE = 170.0;
-    public static double BRAKE_BUFFER_ANGLE = 40.0;
+    public static double BRAKE_BUFFER_ANGLE = 30.0;
     public static double RETURN_POWER = 0.3;
     public static int REST_TIME_MS = 500;
 

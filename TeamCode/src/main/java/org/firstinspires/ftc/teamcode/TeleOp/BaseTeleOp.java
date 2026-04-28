@@ -51,6 +51,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
     private boolean lastRightBumperState = false;
     private boolean lastRightStickButtonState = false;
     private double manualTargetDistance = 25.0;
+    private static final double BRAKE_STICK_THRESHOLD = 0.15;
 
     private boolean lastConditionsMet = false;
     private long lastRumbleTime = 0;
@@ -163,6 +164,8 @@ public abstract class BaseTeleOp extends LinearOpMode {
             }
             lastBackState = currentBackState;
 
+            boolean isBraking = Math.hypot(gamepad1.left_stick_x, gamepad1.left_stick_y) < BRAKE_STICK_THRESHOLD;
+
             if (isClimbing) {
                 climbSubsystem.runAutoClimb(true, telemetry);
             } else {
@@ -209,7 +212,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
                     rx_odo, ry_odo, globalVx, globalVy, rawHeadingDeg, robotOmega,
                     TARGET_X_WORLD, TARGET_Y_WORLD,
                     isManualMode, manualTargetDistance,
-                    isClimbing, isShootOnTheMove
+                    isClimbing, isShootOnTheMove, isBraking
             );
 
             boolean isBBBReady = !isShootingMode || (bbbTimer.milliseconds() >= GlobalConstants.BBB_DELAY_MS);
@@ -285,6 +288,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
             telemetry.addData("Actually Shooting", actuallyShooting ? "YES (Firing!)" : "BLOCKED (Aim or RPM Not Ready)");
             telemetry.addData("Shoot-on-the-Move (RB)", isShootOnTheMove ? "ENABLED (跑打开启)" : "DISABLED (静止定点)");
             telemetry.addData("Aim Locked", effectiveAimLocked ? "YES" : "NO");
+            telemetry.addData("Braking Detected", isBraking ? "YES (Override Active)" : "NO");
 
             if (isVisionTargetVisible) {
                 telemetry.addData("Vision Calib", "READY (Press Right Stick R3 to Calibrate Once)");
