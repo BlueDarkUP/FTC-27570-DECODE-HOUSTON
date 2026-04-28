@@ -8,7 +8,8 @@ import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
-
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import org.firstinspires.ftc.teamcode.Storage.RobotStateStorage;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.GlobalConstants;
 import org.firstinspires.ftc.teamcode.Subsystems.ForAuto.*;
@@ -21,6 +22,7 @@ public class REDclose2gate extends OpMode {
     private TurretSubsystem turret;
     private FlywheelSubsystem flywheel;
     private IntakeShooterSubsystem intakeShooter;
+    private DcMotorEx rawTurretMotor;
 
     private Timer pathTimer;
     private Timer opmodeTimer;
@@ -312,12 +314,14 @@ public class REDclose2gate extends OpMode {
 
     @Override
     public void init() {
+        RobotStateStorage.clear();
         pathTimer = new Timer();
         opmodeTimer = new Timer();
         pitch = new PitchSubsystem(hardwareMap);
         turret = new TurretSubsystem(hardwareMap);
         flywheel = new FlywheelSubsystem(hardwareMap);
         intakeShooter = new IntakeShooterSubsystem(hardwareMap);
+        rawTurretMotor = hardwareMap.get(DcMotorEx.class, "Turret");
         follower = Constants.createFollower(hardwareMap);
         buildPaths();
         follower.setStartingPose(startPose);
@@ -351,6 +355,10 @@ public class REDclose2gate extends OpMode {
         telemetry.addData("Turret Target Angle", turret.getTargetAngle());
         telemetry.addData("RPM Current/Target", "%.1f / %.1f", flywheel.getCurrentRPM(), flywheel.getTargetRPM());
         telemetry.update();
+        if (rawTurretMotor != null) {
+            RobotStateStorage.turretAngleDeg = (rawTurretMotor.getCurrentPosition() / GlobalConstants.TURRET_TICKS_PER_REV) * 360.0;
+        }
+        RobotStateStorage.isAutoDataValid = true;
     }
 
     @Override

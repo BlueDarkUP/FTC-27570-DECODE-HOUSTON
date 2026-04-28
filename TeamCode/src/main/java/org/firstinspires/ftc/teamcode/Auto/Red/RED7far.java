@@ -7,7 +7,8 @@ import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
-
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import org.firstinspires.ftc.teamcode.Storage.RobotStateStorage;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.GlobalConstants;
 import org.firstinspires.ftc.teamcode.Subsystems.ForAuto.*;
@@ -20,6 +21,7 @@ public class RED7far extends OpMode {
     private TurretSubsystem turret;
     private FlywheelSubsystem flywheel;
     private IntakeShooterSubsystem intakeShooter;
+    private DcMotorEx rawTurretMotor;
 
     private Timer pathTimer;
     private Timer opmodeTimer;
@@ -218,6 +220,7 @@ public class RED7far extends OpMode {
 
     @Override
     public void init() {
+        RobotStateStorage.clear();
         pathTimer = new Timer();
         opmodeTimer = new Timer();
         cycleCount = 0;
@@ -226,6 +229,8 @@ public class RED7far extends OpMode {
         turret = new TurretSubsystem(hardwareMap);
         flywheel = new FlywheelSubsystem(hardwareMap);
         intakeShooter = new IntakeShooterSubsystem(hardwareMap);
+
+        rawTurretMotor = hardwareMap.get(DcMotorEx.class, "Turret");
 
         follower = Constants.createFollower(hardwareMap);
         buildPaths();
@@ -265,6 +270,10 @@ public class RED7far extends OpMode {
         telemetry.addData("Current Target", (cycleCount >= TOTAL_CYCLES) ? "Park" : ((cycleCount % 2 == 0) ? "Corner A" : "Corner B"));
         telemetry.addData("RPM Current/Target", "%.1f / %.1f", flywheel.getCurrentRPM(), flywheel.getTargetRPM());
         telemetry.update();
+        if (rawTurretMotor != null) {
+            RobotStateStorage.turretAngleDeg = (rawTurretMotor.getCurrentPosition() / GlobalConstants.TURRET_TICKS_PER_REV) * 360.0;
+        }
+        RobotStateStorage.isAutoDataValid = true;
     }
 
     @Override

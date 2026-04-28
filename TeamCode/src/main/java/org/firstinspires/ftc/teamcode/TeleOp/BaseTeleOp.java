@@ -18,6 +18,7 @@ import org.firstinspires.ftc.teamcode.Subsystems.IntakeSubsystem;
 import org.firstinspires.ftc.teamcode.Subsystems.MecanumDriveSubsystem;
 import org.firstinspires.ftc.teamcode.Subsystems.ClimbSubsystem;
 import org.firstinspires.ftc.teamcode.GlobalConstants;
+import org.firstinspires.ftc.teamcode.Storage.RobotStateStorage;
 
 public abstract class BaseTeleOp extends LinearOpMode {
 
@@ -71,9 +72,14 @@ public abstract class BaseTeleOp extends LinearOpMode {
         odo.setOffsets(101.16, -160, DistanceUnit.MM);
         odo.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
         odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD, GoBildaPinpointDriver.EncoderDirection.REVERSED);
-        odo.resetPosAndIMU();
-        sleep(300);
-        odo.setPosition(new Pose2D(DistanceUnit.INCH, 72.0, 72.0, AngleUnit.DEGREES, 0.0));
+        if (!RobotStateStorage.isAutoDataValid) {
+            odo.resetPosAndIMU();
+            sleep(300);
+            odo.setPosition(new Pose2D(DistanceUnit.INCH, 72.0, 72.0, AngleUnit.DEGREES, 0.0));
+            telemetry.addLine("[INFO] Default Odometry Setup");
+        } else {
+            telemetry.addLine("[INFO] Inheriting Odometry from Auto (Drift Preserved)");
+        }
         odo.update();
 
         try {

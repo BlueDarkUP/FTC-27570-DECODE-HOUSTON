@@ -11,6 +11,7 @@ import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import org.firstinspires.ftc.teamcode.GlobalConstants;
+import org.firstinspires.ftc.teamcode.Storage.RobotStateStorage;
 
 @Config
 public class AutoAimSubsystem {
@@ -45,6 +46,7 @@ public class AutoAimSubsystem {
 
     private PIDFController turretPIDF;
 
+    private double initialTurretOffset = 0.0;
     private double filteredTurretRelAngle = 0.0;
     private boolean isTurretFilterInitialized = false;
     private double lastTurretRelAngle = 0.0;
@@ -85,6 +87,12 @@ public class AutoAimSubsystem {
         battery = hardwareMap.voltageSensor.iterator().next();
         currentBatteryVoltage = getBatteryVoltage();
         turretPIDF = new PIDFController(TURRET_kP, TURRET_kI, TURRET_kD, TURRET_kF);
+        if (RobotStateStorage.isAutoDataValid) {
+            initialTurretOffset = RobotStateStorage.turretAngleDeg;
+        }
+        else {
+            initialTurretOffset = 0;
+        }
         setPitchServos(0.7);
     }
 
@@ -131,7 +139,7 @@ public class AutoAimSubsystem {
         lastTime = currentTimeNanos;
 
         double currentTurretTicks = Turret.getCurrentPosition();
-        double rawTurretRelAngle = (currentTurretTicks / GlobalConstants.TURRET_TICKS_PER_REV) * 360.0;
+        double rawTurretRelAngle = (currentTurretTicks / GlobalConstants.TURRET_TICKS_PER_REV) * 360.0 + initialTurretOffset;
 
         if (!isTurretFilterInitialized) {
             filteredTurretRelAngle = rawTurretRelAngle;

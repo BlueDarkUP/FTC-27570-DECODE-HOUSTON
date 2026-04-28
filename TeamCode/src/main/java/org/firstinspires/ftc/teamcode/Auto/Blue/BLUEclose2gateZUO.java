@@ -8,7 +8,9 @@ import com.pedropathing.paths.PathChain;
 import com.pedropathing.util.Timer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 
+import org.firstinspires.ftc.teamcode.Storage.RobotStateStorage;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.GlobalConstants;
 import org.firstinspires.ftc.teamcode.Subsystems.ForAuto.*;
@@ -21,6 +23,7 @@ public class BLUEclose2gateZUO extends OpMode {
     private TurretSubsystem turret;
     private FlywheelSubsystem flywheel;
     private IntakeShooterSubsystem intakeShooter;
+    private DcMotorEx rawTurretMotor;
 
     private Timer pathTimer;
     private Timer opmodeTimer;
@@ -402,6 +405,7 @@ public class BLUEclose2gateZUO extends OpMode {
 
     @Override
     public void init() {
+        RobotStateStorage.clear();
         pathTimer = new Timer();
         opmodeTimer = new Timer();
         loopTimer = new Timer();
@@ -409,6 +413,7 @@ public class BLUEclose2gateZUO extends OpMode {
         turret = new TurretSubsystem(hardwareMap);
         flywheel = new FlywheelSubsystem(hardwareMap);
         intakeShooter = new IntakeShooterSubsystem(hardwareMap);
+        rawTurretMotor = hardwareMap.get(DcMotorEx.class, "Turret");
         follower = Constants.createFollower(hardwareMap);
         buildPaths();
         follower.setStartingPose(startPose);
@@ -442,6 +447,10 @@ public class BLUEclose2gateZUO extends OpMode {
         telemetry.addData("Turret Angle", turret.getTargetAngle());
         telemetry.addData("Loop Timer (s)", loopTimer.getElapsedTimeSeconds());
         telemetry.update();
+        if (rawTurretMotor != null) {
+            RobotStateStorage.turretAngleDeg = (rawTurretMotor.getCurrentPosition() / GlobalConstants.TURRET_TICKS_PER_REV) * 360.0;
+        }
+        RobotStateStorage.isAutoDataValid = true;
     }
 
     @Override
