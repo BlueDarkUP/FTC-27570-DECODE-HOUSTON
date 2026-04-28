@@ -43,6 +43,8 @@ public class AutoAimSubsystem {
     public static double BRAKE_PREDICTION_WEIGHT = 0.55;
     public static double FORWARD_BRAKE_DECEL = 33.09567766;
     public static double LATERAL_BRAKE_DECEL = 52.88478403;
+    public static double OMEGA_FILTER_ALPHA = 0.7;
+    public static double HEADING_CORRECTION_ALPHA = 0.5;
 
     private PIDFController turretPIDF;
 
@@ -64,6 +66,9 @@ public class AutoAimSubsystem {
     private double filteredLateralAccel = 0.0;
     private double lastFilteredForward = 0.0;
     private double lastFilteredLateral = 0.0;
+    private double filteredRobotOmega = 0.0;
+    private double smoothHeading = 0.0;
+    private boolean isSmoothHeadingInit = false;
 
     public static class TurretCommand {
         public boolean hasTarget = false;
@@ -133,7 +138,7 @@ public class AutoAimSubsystem {
             double currentHeadingDeg, double robotAngularVelocityDeg,
             double targetX, double targetY,
             boolean isManualMode, double manualDist, boolean isClimbing,
-            boolean isShootOnTheMove, boolean isBraking) { // <-- 注意这里新增了 isBraking 参数
+            boolean isShootOnTheMove, boolean isBraking) {
 
         turretPIDF.setPIDF(TURRET_kP, TURRET_kI, TURRET_kD, TURRET_kF);
         TurretCommand command = new TurretCommand();
@@ -200,7 +205,21 @@ public class AutoAimSubsystem {
             return command;
         }
 
-        double headingRad = Math.toRadians(currentHeadingDeg);
+        if (!isSmoothHeadingInit) {
+            smoothHeading = currentHeadingDeg;
+            filteredRobotOmega = robotAngularVelocityDeg;
+            isSmoothHeadingInit = true;
+        } else {
+            filteredRobotOmega += OMEGA_FILTER_ALPHA * (robotAngularVelocityDeg - filteredRobotOmega);
+            smoothHeading += filteredRobotOmega * dt;
+            double headingError = currentHeadingDeg - smoothHeading;
+            while (headingError > 180) headingError -= 360;
+            while (headingError < -180) headingError += 360;
+            smoothHeading += HEADING_CORRECTION_ALPHA * headingError;
+            while (smoothHeading > 180) smoothHeading -= 360;
+            while (smoothHeading < -180) smoothHeading += 360;
+        }
+        double headingRad = Math.toRadians(smoothHeading);
         double cosH = Math.cos(headingRad);
         double sinH = Math.sin(headingRad);
 
@@ -240,7 +259,7 @@ public class AutoAimSubsystem {
         if (isManualMode) {
             double manualRpm = AimCalculator.interpolate(manualDist, 1);
             double manualPitch = AimCalculator.interpolate(manualDist, 2);
-            aimResult = new AimCalculator.AimResult(manualDist, currentHeadingDeg, manualRpm, manualPitch, 0.0);
+            aimResult = new AimCalculator.AimResult(manualDist, smoothHeading, manualRpm, manualPitch, 0.0);
         } else {
             double currentDistToTarget = Math.hypot(targetX - robotX, targetY - robotY);
             double dynamicFlightTime = (currentDistToTarget >= AimCalculator.FAR_DIST_THRESHOLD) ?
@@ -296,7 +315,7 @@ public class AutoAimSubsystem {
             }
 
             double compensatedTargetAbsAngle = aimResult.algYaw + (translationalOmegaDeg * TURRET_LATENCY);
-            double currentTurretAbsAngle = currentHeadingDeg + filteredTurretRelAngle;
+            double currentTurretAbsAngle = smoothHeading + filteredTurretRelAngle;
             double error = compensatedTargetAbsAngle - currentTurretAbsAngle;
 
             while (error > 180) error -= 360;
@@ -329,7 +348,7 @@ public class AutoAimSubsystem {
             }
 
             double pidOutputVel = turretPIDF.calculate(predictedRelAngle, targetTurretRelAngle);
-            double feedforwardVel = -robotAngularVelocityDeg + translationalOmegaDeg;
+            double feedforwardVel = -filteredRobotOmega + translationalOmegaDeg;
             double finalTargetVel = pidOutputVel + feedforwardVel;
 
             double rawTargetAccel = 0.0;
@@ -370,5 +389,6 @@ public class AutoAimSubsystem {
         isTurretFilterInitialized = false;
         isChassisFilterInitialized = false;
         isCurrentlyUnwinding = false;
+        isSmoothHeadingInit = false;
     }
 }
