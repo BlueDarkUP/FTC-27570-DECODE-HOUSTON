@@ -69,7 +69,7 @@ public class IntakeSubsystem {
                     motorIntake.setPower(0.0);
                     systemStatusMessage = "⏳ 等待 BBB 展开 (600ms)...";
                 } else if (hasTarget) {
-                    if (targetDist < 130.0) {
+                    if (targetDist < 120.0) {
                         motorIntake.setPower(1.0);
                         systemStatusMessage = "⚡ 跑打强行给弹中 (近战 1.0)!";
                     } else {
@@ -77,8 +77,8 @@ public class IntakeSubsystem {
                             motorIntake.setPower(0.0);
                             systemStatusMessage = currentRPM < targetRPM ? "⏳ 等待飞轮加速..." : "⏳ 等待飞轮减速...";
                         } else {
-                            motorIntake.setPower(1);
-                            systemStatusMessage = String.format(java.util.Locale.US, "⚡ 跑打强行给弹中 (远射 %.2f)!", 1.0);
+                            motorIntake.setPower(0.86);
+                            systemStatusMessage = String.format(java.util.Locale.US, "⚡ 跑打强行给弹中 (远射 %.2f)!", 0.86);
                         }
                     }
                 } else {
