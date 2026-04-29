@@ -83,7 +83,9 @@ public class AutoAimSubsystem {
     public AutoAimSubsystem(HardwareMap hardwareMap) {
         this.hardwareMap = hardwareMap;
         Turret = hardwareMap.get(DcMotorEx.class, "Turret");
-        Turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        if (!RobotStateStorage.isAutoDataValid) {
+            Turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        }
         Turret.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         Turret.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         LP = hardwareMap.get(Servo.class, "LP");
@@ -91,12 +93,7 @@ public class AutoAimSubsystem {
         battery = hardwareMap.voltageSensor.iterator().next();
         currentBatteryVoltage = getBatteryVoltage();
         turretPIDF = new PIDFController(TURRET_kP, TURRET_kI, TURRET_kD, TURRET_kF);
-        if (RobotStateStorage.isAutoDataValid) {
-            initialTurretOffset = RobotStateStorage.turretAngleDeg;
-        }
-        else {
-            initialTurretOffset = 0;
-        }
+        initialTurretOffset = 0.0;
         setPitchServos(0.7);
     }
 

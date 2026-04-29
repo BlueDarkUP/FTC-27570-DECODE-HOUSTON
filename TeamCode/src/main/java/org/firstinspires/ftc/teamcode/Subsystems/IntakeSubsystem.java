@@ -77,7 +77,7 @@ public class IntakeSubsystem {
                             motorIntake.setPower(0.0);
                             systemStatusMessage = currentRPM < targetRPM ? "⏳ 等待飞轮加速..." : "⏳ 等待飞轮减速...";
                         } else {
-                            motorIntake.setPower(0.86);
+                            motorIntake.setPower(0.82);
                             systemStatusMessage = String.format(java.util.Locale.US, "⚡ 跑打强行给弹中 (远射 %.2f)!", 0.86);
                         }
                     }

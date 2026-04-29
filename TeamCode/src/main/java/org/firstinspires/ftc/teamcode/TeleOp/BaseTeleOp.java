@@ -86,19 +86,30 @@ public abstract class BaseTeleOp extends LinearOpMode {
             telemetry.addLine("[INFO] Default Odometry Setup");
         } else {
             sleep(300);
+            odo.update();
+            Pose2D livePinpointPose = odo.getPosition();
+            double liveX = livePinpointPose.getX(DistanceUnit.INCH);
+            double liveY = livePinpointPose.getY(DistanceUnit.INCH);
+            double liveHeading = livePinpointPose.getHeading(AngleUnit.DEGREES);
+            double cx, cy, pedroHeadingDeg;
+            if (Math.abs(liveX) > 0.001 || Math.abs(liveY) > 0.001) {
+                cx = liveX - 72.0;
+                cy = liveY - 72.0;
+                pedroHeadingDeg = liveHeading;
+            } else {
+                cx = RobotStateStorage.odoX - 72.0;
+                cy = RobotStateStorage.odoY - 72.0;
+                pedroHeadingDeg = Math.toDegrees(RobotStateStorage.odoHeading);
+            }
             double PEDRO_MAP_OFFSET_DEG = -90.0;
             double thetaRad = Math.toRadians(PEDRO_MAP_OFFSET_DEG);
 
-            double cx = RobotStateStorage.odoX - 72.0;
-            double cy = RobotStateStorage.odoY - 72.0;
-
             double trueFieldX = (cx * Math.cos(thetaRad)) - (cy * Math.sin(thetaRad)) + 72.0;
             double trueFieldY = (cx * Math.sin(thetaRad)) + (cy * Math.cos(thetaRad)) + 72.0;
-            double pedroHeadingDeg = Math.toDegrees(RobotStateStorage.odoHeading);
             double trueFieldHeadingDeg = pedroHeadingDeg + PEDRO_MAP_OFFSET_DEG;
 
             odo.setPosition(new Pose2D(DistanceUnit.INCH, trueFieldX, trueFieldY, AngleUnit.DEGREES, trueFieldHeadingDeg));
-            telemetry.addLine("[INFO] Inheriting Odometry from Auto (Fixed Field Map Rotation Applied)");
+            telemetry.addLine("[INFO] Inheriting Odometry from Auto (Slide Coasting Handled & Fixed Rotation Applied)");
         }
         odo.update();
 
