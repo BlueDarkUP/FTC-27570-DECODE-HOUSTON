@@ -359,6 +359,10 @@ public class BLUEclose2gate extends OpMode {
         if (rawTurretMotor != null) {
             RobotStateStorage.turretAngleDeg = (rawTurretMotor.getCurrentPosition() / GlobalConstants.TURRET_TICKS_PER_REV) * 360.0;
         }
+        Pose currentPose = follower.getPose();
+        RobotStateStorage.odoX = currentPose.getX();
+        RobotStateStorage.odoY = currentPose.getY();
+        RobotStateStorage.odoHeading = currentPose.getHeading();
         RobotStateStorage.isAutoDataValid = true;
     }
 
@@ -367,5 +371,9 @@ public class BLUEclose2gate extends OpMode {
         turret.stop();
         flywheel.stop();
         intakeShooter.stop();
+        Pose currentPose = follower.getPose();
+        RobotStateStorage.odoX = currentPose.getX();
+        RobotStateStorage.odoY = currentPose.getY();
+        RobotStateStorage.odoHeading = currentPose.getHeading();
     }
 }

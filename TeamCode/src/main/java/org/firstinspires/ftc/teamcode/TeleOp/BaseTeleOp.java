@@ -46,6 +46,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
     private boolean lastLeftBumperState = false;
     private boolean lastSquareState = false;
     private boolean lastBackState = false;
+    private boolean lastOptionsState = false;
 
     private boolean isShootOnTheMove = false;
     private boolean lastRightBumperState = false;
@@ -77,13 +78,27 @@ public abstract class BaseTeleOp extends LinearOpMode {
         odo.setOffsets(101.16, -160, DistanceUnit.MM);
         odo.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
         odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD, GoBildaPinpointDriver.EncoderDirection.REVERSED);
+
         if (!RobotStateStorage.isAutoDataValid) {
             odo.resetPosAndIMU();
             sleep(300);
             odo.setPosition(new Pose2D(DistanceUnit.INCH, 72.0, 72.0, AngleUnit.DEGREES, 0.0));
             telemetry.addLine("[INFO] Default Odometry Setup");
         } else {
-            telemetry.addLine("[INFO] Inheriting Odometry from Auto (Drift Preserved)");
+            sleep(300);
+            double PEDRO_MAP_OFFSET_DEG = -90.0;
+            double thetaRad = Math.toRadians(PEDRO_MAP_OFFSET_DEG);
+
+            double cx = RobotStateStorage.odoX - 72.0;
+            double cy = RobotStateStorage.odoY - 72.0;
+
+            double trueFieldX = (cx * Math.cos(thetaRad)) - (cy * Math.sin(thetaRad)) + 72.0;
+            double trueFieldY = (cx * Math.sin(thetaRad)) + (cy * Math.cos(thetaRad)) + 72.0;
+            double pedroHeadingDeg = Math.toDegrees(RobotStateStorage.odoHeading);
+            double trueFieldHeadingDeg = pedroHeadingDeg + PEDRO_MAP_OFFSET_DEG;
+
+            odo.setPosition(new Pose2D(DistanceUnit.INCH, trueFieldX, trueFieldY, AngleUnit.DEGREES, trueFieldHeadingDeg));
+            telemetry.addLine("[INFO] Inheriting Odometry from Auto (Fixed Field Map Rotation Applied)");
         }
         odo.update();
 
@@ -122,6 +137,14 @@ public abstract class BaseTeleOp extends LinearOpMode {
             double rx_odo = pos.getX(DistanceUnit.INCH);
             double ry_odo = pos.getY(DistanceUnit.INCH);
             double rawHeadingDeg = pos.getHeading(AngleUnit.DEGREES);
+
+            boolean currentOptionsState = gamepad1.options;
+            if (currentOptionsState && !lastOptionsState) {
+                odo.setPosition(new Pose2D(DistanceUnit.INCH, rx_odo, ry_odo, AngleUnit.DEGREES, headingOffset));
+                rawHeadingDeg = headingOffset;
+                gamepad1.rumble(250);
+            }
+            lastOptionsState = currentOptionsState;
             double currentHeadingDeg = rawHeadingDeg - headingOffset;
 
             double globalVx = odo.getVelX(DistanceUnit.INCH);
@@ -306,6 +329,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
             );
 
             telemetry.addData("Mode", isManualMode ? "MANUAL" : "AUTO-AIM");
+            telemetry.addData("Heading Calib (G1)", "Press OPTIONS facing Opponent to reset forward");
             telemetry.addData("Yaw Tuning Offset (G2)", "%.1f deg (Press G2 X to reset)", manualYawOffset);
             telemetry.addData("Shooting Mode", isShootingMode ? "ACTIVE (Button Pressed)" : "IDLE");
             telemetry.addData("Actually Shooting", actuallyShooting ? "YES (Firing!)" : "BLOCKED (Aim or RPM Not Ready)");

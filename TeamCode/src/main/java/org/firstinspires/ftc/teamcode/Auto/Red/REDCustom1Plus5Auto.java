@@ -59,7 +59,7 @@ public class REDCustom1Plus5Auto extends OpMode {
     private final Pose preIntake3Pose = new Pose(104.000, 34.000, Math.toRadians(0));
     private final Pose corner3Pose = new Pose(134.000, 34.000, Math.toRadians(0));
     private final Pose cornerAPose = new Pose(134.000, 10.000, Math.toRadians(0));
-    private final Pose cornerBPose = new Pose(132.000, 23.000, Math.toRadians(0));
+    private final Pose cornerBPose = new Pose(132.000, 34.000, Math.toRadians(0));
 
     public void buildPaths() {
         // 起点到发射点
@@ -154,13 +154,13 @@ public class REDCustom1Plus5Auto extends OpMode {
             case 33:
                 // 吸取等待
                 if (pathTimer.getElapsedTimeSeconds() >= INTAKE_WAIT_TIME) {
+                    intakeShooter.setIntakePower(0.0);
                     follower.followPath(corner3ToShoot, true);
                     setPathState(34);
                 }
                 break;
             case 34:
                 if (!follower.isBusy()) {
-                    intakeShooter.setIntakePower(0.0);
                     setPathState(35);
                 }
                 break;
@@ -197,13 +197,13 @@ public class REDCustom1Plus5Auto extends OpMode {
                 if (pathTimer.getElapsedTimeSeconds() >= INTAKE_WAIT_TIME) setPathState(23);
                 break;
             case 23:
+                intakeShooter.setIntakePower(0.0); // <-- 修改点：在开始返回路径时提前关闭 Intake
                 if (cycleCount % 2 == 0) follower.followPath(cornerAToShoot, true);
                 else follower.followPath(cornerBToShoot, true);
                 setPathState(24);
                 break;
             case 24:
                 if (!follower.isBusy()) {
-                    intakeShooter.setIntakePower(0.0);
                     setPathState(25);
                 }
                 break;
@@ -286,6 +286,10 @@ public class REDCustom1Plus5Auto extends OpMode {
         if (rawTurretMotor != null) {
             RobotStateStorage.turretAngleDeg = (rawTurretMotor.getCurrentPosition() / GlobalConstants.TURRET_TICKS_PER_REV) * 360.0;
         }
+        Pose currentPose = follower.getPose();
+        RobotStateStorage.odoX = currentPose.getX();
+        RobotStateStorage.odoY = currentPose.getY();
+        RobotStateStorage.odoHeading = currentPose.getHeading();
         RobotStateStorage.isAutoDataValid = true;
     }
 
@@ -294,5 +298,9 @@ public class REDCustom1Plus5Auto extends OpMode {
         turret.stop();
         flywheel.stop();
         intakeShooter.stop();
+        Pose currentPose = follower.getPose();
+        RobotStateStorage.odoX = currentPose.getX();
+        RobotStateStorage.odoY = currentPose.getY();
+        RobotStateStorage.odoHeading = currentPose.getHeading();
     }
 }
