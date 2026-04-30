@@ -6,13 +6,25 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 public class RedTeleOp extends BaseTeleOp {
 
     @Override
-    protected double getTargetX() {
+    protected double getBaseTargetX() {
         return 135.0;
     }
+
     @Override
-    protected double getTargetY() {
+    protected double getBaseTargetY() {
         return 11.0;
     }
+
+    @Override
+    protected double getFarTargetX() {
+        return 140.0;
+    }
+
+    @Override
+    protected double getFarTargetY() {
+        return 10.0;
+    }
+
     @Override
     protected double getHeadingOffset() {
         return -90.0;

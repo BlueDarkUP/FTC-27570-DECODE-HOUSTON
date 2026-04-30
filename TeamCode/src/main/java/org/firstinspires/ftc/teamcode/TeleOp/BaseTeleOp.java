@@ -36,8 +36,10 @@ public abstract class BaseTeleOp extends LinearOpMode {
     protected double TARGET_Y_WORLD;
     protected double headingOffset = 0.0;
 
-    protected abstract double getTargetX();
-    protected abstract double getTargetY();
+    protected abstract double getBaseTargetX();
+    protected abstract double getBaseTargetY();
+    protected abstract double getFarTargetX();
+    protected abstract double getFarTargetY();
     protected abstract double getHeadingOffset();
 
     private boolean isShootingMode = false;
@@ -65,8 +67,8 @@ public abstract class BaseTeleOp extends LinearOpMode {
 
     @Override
     public void runOpMode() {
-        TARGET_X_WORLD = getTargetX();
-        TARGET_Y_WORLD = getTargetY();
+        TARGET_X_WORLD = getBaseTargetX();
+        TARGET_Y_WORLD = getBaseTargetY();
         headingOffset = getHeadingOffset();
 
         telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
@@ -131,8 +133,8 @@ public abstract class BaseTeleOp extends LinearOpMode {
         climbSubsystem.init(hardwareMap);
 
         telemetry.addLine("Ready to Start");
-        telemetry.addData("Alliance Target X", TARGET_X_WORLD);
-        telemetry.addData("Alliance Target Y", TARGET_Y_WORLD);
+        telemetry.addData("Base Target X", getBaseTargetX());
+        telemetry.addData("Base Target Y", getBaseTargetY());
         telemetry.addData("Heading Offset", headingOffset);
         telemetry.update();
 
@@ -157,6 +159,17 @@ public abstract class BaseTeleOp extends LinearOpMode {
             }
             lastOptionsState = currentOptionsState;
             double currentHeadingDeg = rawHeadingDeg - headingOffset;
+
+            // 动态远射目标切换
+            double distToBase = Math.hypot(getBaseTargetX() - rx_odo, getBaseTargetY() - ry_odo);
+            boolean isFarMode = distToBase > 120.0;
+            if (isFarMode) {
+                TARGET_X_WORLD = getFarTargetX();
+                TARGET_Y_WORLD = getFarTargetY();
+            } else {
+                TARGET_X_WORLD = getBaseTargetX();
+                TARGET_Y_WORLD = getBaseTargetY();
+            }
 
             double globalVx = odo.getVelX(DistanceUnit.INCH);
             double globalVy = odo.getVelY(DistanceUnit.INCH);
@@ -340,6 +353,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
             );
 
             telemetry.addData("Mode", isManualMode ? "MANUAL" : "AUTO-AIM");
+            telemetry.addData("Target Config", "(%.1f, %.1f) %s", TARGET_X_WORLD, TARGET_Y_WORLD, isFarMode ? "[FAR MODE打板]" : "[CLOSE MODE]");
             telemetry.addData("Heading Calib (G1)", "Press OPTIONS facing Opponent to reset forward");
             telemetry.addData("Yaw Tuning Offset (G2)", "%.1f deg (Press G2 X to reset)", manualYawOffset);
             telemetry.addData("Shooting Mode", isShootingMode ? "ACTIVE (Button Pressed)" : "IDLE");
