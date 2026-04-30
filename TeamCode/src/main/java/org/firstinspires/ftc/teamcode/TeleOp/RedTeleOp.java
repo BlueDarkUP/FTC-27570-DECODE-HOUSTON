@@ -17,7 +17,7 @@ public class RedTeleOp extends BaseTeleOp {
 
     @Override
     protected double getFarTargetX() {
-        return 140.0;
+        return 136.0;
     }
 
     @Override

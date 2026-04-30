@@ -326,7 +326,7 @@ public class REDclose21 extends OpMode {
                 }
                 break;
             case 62:
-                if (pathTimer.getElapsedTimeSeconds() >= 1.1) {
+                if (pathTimer.getElapsedTimeSeconds() >= 1) {
                     setPathState(70);
                 }
                 break;

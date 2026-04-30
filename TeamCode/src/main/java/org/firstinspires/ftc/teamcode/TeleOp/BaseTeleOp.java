@@ -56,6 +56,10 @@ public abstract class BaseTeleOp extends LinearOpMode {
     private boolean lastG2LeftBumperState = false;
     private boolean lastG2RightBumperState = false;
     private boolean lastG2SquareState = false;
+    private boolean lastG2DpadUpState = false;
+    private boolean lastG2DpadDownState = false;
+    private double manualRpmOffset = 0.0;
+    private long lastG2LightRumbleTime = 0;
     private double manualTargetDistance = 25.0;
     private double manualYawOffset = 0.0;
     private static final double BRAKE_STICK_THRESHOLD = 0.15;
@@ -173,6 +177,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
 
             double globalVx = odo.getVelX(DistanceUnit.INCH);
             double globalVy = odo.getVelY(DistanceUnit.INCH);
+            double robotSpeed = Math.hypot(globalVx, globalVy);
 
             if (visionLocalizer != null) {
                 visionLocalizer.updateLimelightOrientation(rawHeadingDeg);
@@ -185,6 +190,13 @@ public abstract class BaseTeleOp extends LinearOpMode {
 
                 if (visionPose != null) {
                     isVisionTargetVisible = true;
+                    if (robotSpeed < 4.0) {
+                        long currentTime = System.currentTimeMillis();
+                        if (currentTime - lastG2LightRumbleTime > 100) {
+                            gamepad2.rumble(0.3, 0.3, 100);
+                            lastG2LightRumbleTime = currentTime;
+                        }
+                    }
                     if (currentG2RightStickButton && !lastG2RightStickButtonState) {
                         double targetWorldX_Inches = visionPose.getX(DistanceUnit.INCH);
                         double targetWorldY_Inches = visionPose.getY(DistanceUnit.INCH);
@@ -200,7 +212,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
                         rx_odo = fusedX;
                         ry_odo = fusedY;
 
-                        gamepad2.rumble(100);
+                        gamepad2.rumble(1.0, 1.0, 400);
                     }
                 }
             }
@@ -209,6 +221,8 @@ public abstract class BaseTeleOp extends LinearOpMode {
             boolean currentG2LeftBumper = gamepad2.left_bumper;
             boolean currentG2RightBumper = gamepad2.right_bumper;
             boolean currentG2Square = gamepad2.x;
+            boolean currentG2DpadUp = gamepad2.dpad_up;
+            boolean currentG2DpadDown = gamepad2.dpad_down;
 
             if (currentG2LeftBumper && !lastG2LeftBumperState) {
                 manualYawOffset += 0.3;
@@ -216,14 +230,22 @@ public abstract class BaseTeleOp extends LinearOpMode {
             if (currentG2RightBumper && !lastG2RightBumperState) {
                 manualYawOffset -= 0.3;
             }
+            if (currentG2DpadUp && !lastG2DpadUpState) {
+                manualRpmOffset += 10.0;
+            }
+            if (currentG2DpadDown && !lastG2DpadDownState) {
+                manualRpmOffset -= 10.0;
+            }
             if (currentG2Square && !lastG2SquareState) {
                 manualYawOffset = 0.0;
+                manualRpmOffset = 0.0;
             }
 
             lastG2LeftBumperState = currentG2LeftBumper;
             lastG2RightBumperState = currentG2RightBumper;
             lastG2SquareState = currentG2Square;
-
+            lastG2DpadUpState = currentG2DpadUp;
+            lastG2DpadDownState = currentG2DpadDown;
 
             boolean isClimbing = gamepad1.touchpad;
 
@@ -290,14 +312,14 @@ public abstract class BaseTeleOp extends LinearOpMode {
             if (isEmergencyBrake) {
                 targetVelocityRPM = 0;
             } else if (aimCommand.hasTarget) {
-                targetVelocityRPM = aimCommand.targetRpm;
+                targetVelocityRPM = aimCommand.targetRpm + manualRpmOffset;
             }
 
             flywheelSubsystem.update(targetVelocityRPM, isEmergencyBrake, aimCommand.hasTarget);
 
             boolean rpmOK = flywheelSubsystem.isReady();
             if (aimCommand.hasTarget && aimCommand.targetDist >= 130.0) {
-                rpmOK = Math.abs(flywheelSubsystem.getCurrentRPM() - aimCommand.targetRpm) <= 114514.0;
+                rpmOK = Math.abs(flywheelSubsystem.getCurrentRPM() - targetVelocityRPM) <= 114514.0;
             }
 
             boolean effectiveAimLocked = isManualMode ? true : aimCommand.isAimLocked;
@@ -356,6 +378,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
             telemetry.addData("Target Config", "(%.1f, %.1f) %s", TARGET_X_WORLD, TARGET_Y_WORLD, isFarMode ? "[FAR MODE打板]" : "[CLOSE MODE]");
             telemetry.addData("Heading Calib (G1)", "Press OPTIONS facing Opponent to reset forward");
             telemetry.addData("Yaw Tuning Offset (G2)", "%.1f deg (Press G2 X to reset)", manualYawOffset);
+            telemetry.addData("RPM Tuning Offset (G2)", "%.0f RPM (Press G2 X to reset)", manualRpmOffset);
             telemetry.addData("Shooting Mode", isShootingMode ? "ACTIVE (Button Pressed)" : "IDLE");
             telemetry.addData("Actually Shooting", actuallyShooting ? "YES (Firing!)" : "BLOCKED (Aim or RPM Not Ready)");
             telemetry.addData("Shoot-on-the-Move (RB)", isShootOnTheMove ? "ENABLED (跑打开启)" : "DISABLED (静止定点)");
@@ -368,7 +391,7 @@ public abstract class BaseTeleOp extends LinearOpMode {
                 telemetry.addData("Vision Calib (G2)", "SEARCHING (No Tag)");
             }
             telemetry.addData("Target Dist", "%.2f inch", aimCommand.targetDist);
-            telemetry.addData("Flywheel RPM", "Target: %.0f | Current: %.0f", aimCommand.targetRpm, flywheelSubsystem.getCurrentRPM());
+            telemetry.addData("Flywheel RPM", "Target: %.0f | Current: %.0f", targetVelocityRPM, flywheelSubsystem.getCurrentRPM()); // 更改为显示调准后的 Target RPM
             telemetry.update();
         }
 

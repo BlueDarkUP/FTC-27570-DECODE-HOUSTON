@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Auto.Red;
+package org.firstinspires.ftc.teamcode.Auto.Blue.personalised;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierCurve;
@@ -15,8 +15,8 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 import org.firstinspires.ftc.teamcode.GlobalConstants;
 import org.firstinspires.ftc.teamcode.Subsystems.ForAuto.*;
 
-@Autonomous(name = "红方开门嘬两次自动", group = "Autonomous")
-public class REDclose2gateZUO extends OpMode {
+@Autonomous(name = "蓝方自动适配24006", group = "Autonomous")
+public class BlueFor24006 extends OpMode {
 
     private Follower follower;
     private PitchSubsystem pitch;
@@ -30,6 +30,9 @@ public class REDclose2gateZUO extends OpMode {
     private Timer loopTimer;
     private int pathState;
 
+    // 新增：用于记录“开门嘬”的次数
+    private int zuoCount = 0;
+
     public PathChain fasheyuzhi;
     public PathChain xidiyipai;
     public PathChain kaimen;
@@ -39,137 +42,114 @@ public class REDclose2gateZUO extends OpMode {
     public PathChain fashedierpai;
     public PathChain Path11;
     public PathChain Path12;
-    public PathChain xidisanpai;
-    public PathChain fashedisanpai;
     public PathChain tingkao;
 
-    private final Pose startPose = new Pose(109.000, 135.000, Math.toRadians(0));
+    private final Pose startPose = new Pose(35.000, 135.000, Math.toRadians(180));
 
     public void buildPaths() {
         fasheyuzhi = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(109.000, 135.000),
-                                new Pose(100.000, 84.000)
+                                new Pose(35.000, 135.000),
+                                new Pose(44.000, 84.000)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(0))
+                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(180))
                 .build();
 
         xidiyipai = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(100.000, 84.000),
-                                new Pose(126.000, 84.000)
+                                new Pose(44.000, 84.000),
+                                new Pose(18.000, 84.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(0))
+                .setConstantHeadingInterpolation(Math.toRadians(180))
                 .build();
 
         kaimen = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(126.000, 84.000),
-                                new Pose(123.692, 75.308),
-                                new Pose(127.000, 75.000)
+                                new Pose(18.000, 84.000),
+                                new Pose(20.308, 75.308),
+                                new Pose(17.000, 75.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(0))
+                .setConstantHeadingInterpolation(Math.toRadians(180))
                 .build();
 
         fashediyipai = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(127.000, 75.000),
-                                new Pose(84.000, 75.000)
+                                new Pose(17.000, 75.000),
+                                new Pose(60.000, 75.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(0))
+                .setConstantHeadingInterpolation(Math.toRadians(180))
                 .build();
 
         kaidiercimen = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(84.000, 75.000),
-                                new Pose(79.000, 58.000),
-                                new Pose(131.000, 58.500)
+                                new Pose(60.000, 75.000),
+                                new Pose(65.000, 58.000),
+                                new Pose(13.000, 58.500)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(0))
+                .setConstantHeadingInterpolation(Math.toRadians(180))
                 .build();
 
         Path10 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(131.000, 58.500),
-                                new Pose(108.000, 61.000),
-                                new Pose(125.000, 68.000)
+                                new Pose(13.000, 58.500),
+                                new Pose(36, 61),
+                                new Pose(19, 68)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(0))
+                .setConstantHeadingInterpolation(Math.toRadians(180))
                 .build();
 
         fashedierpai = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(126.000, 65.077),
-                                new Pose(84.000, 75.000)
+                                new Pose(18, 65.077),
+                                new Pose(60.000, 75.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(0))
+                .setConstantHeadingInterpolation(Math.toRadians(180))
                 .build();
 
         Path11 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(84.000, 75.000),
-                                new Pose(102.000, 60.000),
-                                new Pose(132.700, 60)
+                                new Pose(60.000, 75.000),
+                                new Pose(42, 60),
+                                new Pose(11.3, 60)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(23))
+                .setLinearHeadingInterpolation(Math.toRadians(180), Math.toRadians(157))
                 .build();
 
         Path12 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(132.700, 60),
-                                new Pose(99.000, 61.300),
-                                new Pose(84.000, 75.000)
+                                new Pose(11.3, 60),
+                                new Pose(45.000, 61.3000),
+                                new Pose(60.000, 75.000)
                         )
                 )
-                .setLinearHeadingInterpolation(Math.toRadians(23), Math.toRadians(0))
-                .build();
-
-        xidisanpai = follower.pathBuilder()
-                .addPath(
-                        new BezierCurve(
-                                new Pose(84.000, 75.000),
-                                new Pose(79.000, 30.000),
-                                new Pose(131.000, 35.000)
-                        )
-                )
-                .setConstantHeadingInterpolation(Math.toRadians(0))
-                .build();
-
-        fashedisanpai = follower.pathBuilder()
-                .addPath(
-                        new BezierLine(
-                                new Pose(131.000, 35.000),
-                                new Pose(84.000, 75.000)
-                        )
-                )
-                .setConstantHeadingInterpolation(Math.toRadians(0))
+                .setLinearHeadingInterpolation(Math.toRadians(157), Math.toRadians(180))
                 .build();
 
         tingkao = follower.pathBuilder()
                 .addPath(
                         new BezierLine(
-                                new Pose(84.000, 75.000),
-                                new Pose(84.000, 60.000)
+                                new Pose(60.000, 75.000),
+                                new Pose(60.000, 60.000)
                         )
                 )
-                .setConstantHeadingInterpolation(Math.toRadians(0))
+                .setConstantHeadingInterpolation(Math.toRadians(180))
                 .build();
     }
 
@@ -182,7 +162,7 @@ public class REDclose2gateZUO extends OpMode {
         switch (pathState) {
             case 10:
                 follower.followPath(fasheyuzhi, true);
-                turret.setTargetAngle(50.5);
+                turret.setTargetAngle(-50);
                 flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_NORMAL);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(11);
@@ -193,7 +173,7 @@ public class REDclose2gateZUO extends OpMode {
                 }
                 break;
             case 12:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.07) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(13);
                 }
@@ -217,10 +197,10 @@ public class REDclose2gateZUO extends OpMode {
 
             case 30:
                 pitch.setPitch(GlobalConstants.PITCH_POS_INTAKE_DEEP);
-                flywheel.setTargetRPM(GlobalConstants.AUTO_RPM_DOOR_2);
+                flywheel.setTargetRPM(3400);
                 follower.followPath(kaimen, false);
                 intakeShooter.setIntakePower(0.0);
-                turret.setTargetAngle(50.3);
+                turret.setTargetAngle(-47.5);
                 setPathState(31);
                 break;
             case 31:
@@ -230,7 +210,7 @@ public class REDclose2gateZUO extends OpMode {
                 }
                 break;
             case 32:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.23) {
                     setPathState(40);
                 }
                 break;
@@ -245,7 +225,7 @@ public class REDclose2gateZUO extends OpMode {
                 }
                 break;
             case 42:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.02) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(43);
                 }
@@ -279,7 +259,7 @@ public class REDclose2gateZUO extends OpMode {
                 }
                 break;
             case 62:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.07 ) {
                     setPathState(70);
                 }
                 break;
@@ -294,22 +274,24 @@ public class REDclose2gateZUO extends OpMode {
                 }
                 break;
             case 72:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.07) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(73);
                 }
                 break;
             case 73:
                 if (!intakeShooter.isShootingActive()) {
-                    loopTimer.resetTimer();
                     setPathState(80);
                 }
                 break;
 
+            // 核心修改部分：三次开门嘬循环
             case 80:
-                if (loopTimer.getElapsedTimeSeconds() >= 10.0) {
-                    setPathState(90);
+                if (zuoCount >= 3) {
+                    // 如果已经嘬了3次，跳过后续步骤，直接归位停靠
+                    setPathState(110);
                 } else {
+                    zuoCount++; // 次数+1
                     follower.followPath(Path11, true);
                     intakeShooter.setIntakePower(1.0);
                     setPathState(81);
@@ -322,8 +304,7 @@ public class REDclose2gateZUO extends OpMode {
                 }
                 break;
             case 82:
-                turret.setTargetAngle(50.3);
-                if (pathTimer.getElapsedTimeSeconds() >= 1.5) {
+                if (pathTimer.getElapsedTimeSeconds() >= 1.65) {
                     setPathState(83);
                 }
                 break;
@@ -338,50 +319,19 @@ public class REDclose2gateZUO extends OpMode {
                 }
                 break;
             case 85:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.15) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.12) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(86);
                 }
                 break;
             case 86:
                 if (!intakeShooter.isShootingActive()) {
+                    // 发射完毕后，返回 State 80 进行下一次判断
                     setPathState(80);
                 }
                 break;
 
-            case 90:
-                turret.setTargetAngle(50.3);
-                follower.followPath(xidisanpai, false);
-                intakeShooter.setIntakePower(1.0);
-                setPathState(91);
-                break;
-            case 91:
-                if (!follower.isBusy()) {
-                    setPathState(100);
-                }
-                break;
-
-            case 100:
-                follower.followPath(fashedisanpai, true);
-                intakeShooter.setIntakePower(0.0);
-                setPathState(101);
-                break;
-            case 101:
-                if (!follower.isBusy()) {
-                    setPathState(102);
-                }
-                break;
-            case 102:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
-                    intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
-                    setPathState(103);
-                }
-                break;
-            case 103:
-                if (!intakeShooter.isShootingActive()) {
-                    setPathState(110);
-                }
-                break;
+            // State 90~103 (吸取第三排逻辑) 均已删除，直接进入归位
 
             case 110:
                 follower.followPath(tingkao, true);
@@ -431,6 +381,7 @@ public class REDclose2gateZUO extends OpMode {
         opmodeTimer.resetTimer();
         turret.resetTimer();
         flywheel.resetTimer();
+        zuoCount = 0; // 确保开门嘬的计数器在自动开始时归零
         setPathState(10);
     }
 
@@ -442,11 +393,13 @@ public class REDclose2gateZUO extends OpMode {
         turret.update();
         flywheel.update();
         intakeShooter.update(flywheel);
+
         telemetry.addData("Path State", pathState);
+        telemetry.addData("Zuo Count", zuoCount); // 添加了对于嘬次数的监测，便于调试
         telemetry.addData("Shoot Mode", intakeShooter.getCurrentShootMode());
         telemetry.addData("Turret Angle", turret.getTargetAngle());
-        telemetry.addData("Loop Timer (s)", loopTimer.getElapsedTimeSeconds());
         telemetry.update();
+
         if (rawTurretMotor != null) {
             RobotStateStorage.turretAngleDeg = (rawTurretMotor.getCurrentPosition() / GlobalConstants.TURRET_TICKS_PER_REV) * 360.0;
         }

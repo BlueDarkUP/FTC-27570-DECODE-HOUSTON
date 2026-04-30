@@ -286,7 +286,7 @@ public class BLUEclose21 extends OpMode {
                 }
                 break;
             case 42:
-                if (pathTimer.getElapsedTimeSeconds() >= 1.1) {
+                if (pathTimer.getElapsedTimeSeconds() >= 1) {
                     setPathState(50);
                 }
                 break;
@@ -400,7 +400,7 @@ public class BLUEclose21 extends OpMode {
                 }
                 break;
             case 102:
-                if (pathTimer.getElapsedTimeSeconds() >= 1.1) {
+                if (pathTimer.getElapsedTimeSeconds() >= 1) {
                     setPathState(110);
                 }
                 break;

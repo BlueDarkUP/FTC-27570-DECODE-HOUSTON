@@ -338,7 +338,7 @@ public class BLUEclose2gateZUO extends OpMode {
                 }
                 break;
             case 85:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.3) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_SHORT);
                     setPathState(86);
                 }

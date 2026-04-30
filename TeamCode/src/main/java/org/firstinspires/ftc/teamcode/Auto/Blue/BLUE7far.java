@@ -37,7 +37,7 @@ public class BLUE7far extends OpMode {
     private final double TARGET_RPM = 4090.0;
     private final double TARGET_PITCH = 1;
     private final double TURRET_SHOOT_ANGLE = -68.0;
-    private final double CHASSIS_SETTLE_TIME = 0.3; // 底盘到位后的校准等待时间 (秒)
+    private final double CHASSIS_SETTLE_TIME = 0.1; // 底盘到位后的校准等待时间 (秒)
     // ==================================================
 
     // 拆分后的独立路径
@@ -169,8 +169,10 @@ public class BLUE7far extends OpMode {
             case 23:
                 // 返回发射点 (根据刚才去的哪个点决定返回路径)
                 if (cycleCount % 2 == 0) {
+                    intakeShooter.setIntakePower(0.0);
                     follower.followPath(cornerAToShoot, true); // 发射点需要holdEnd
                 } else {
+                    intakeShooter.setIntakePower(0.0);
                     follower.followPath(cornerBToShoot, true); // 发射点需要holdEnd
                 }
                 setPathState(24);

@@ -178,7 +178,7 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 315:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(32);
                 }
@@ -220,7 +220,7 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 515:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.4) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(52);
                 }
@@ -271,7 +271,7 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 815:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(82);
                 }
@@ -314,7 +314,7 @@ public class BLUE23close18 extends OpMode {
                 }
                 break;
             case 1115:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.2) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.1) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(112);
                 }
