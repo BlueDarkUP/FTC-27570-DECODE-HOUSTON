@@ -85,8 +85,8 @@ public class BLUEclose21 extends OpMode {
                 .build();
 
         //TODO:TTT
-        double kaimenzuox = 11.1;
-        double kaimenzuoy = 60.3;
+        double kaimenzuox = 10.7;
+        double kaimenzuoy = 60.5;
 
         kaimenzuo1 = follower.pathBuilder()
                 .addPath(
@@ -223,7 +223,7 @@ public class BLUEclose21 extends OpMode {
             case 115:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
                     // 使用精射模式（停靠射击）发射0.5秒
-                    intakeShooter.startPrecisionShoot(0.47);
+                    intakeShooter.startPrecisionShoot(0.45);
                     setPathState(12);
                 }
                 break;
@@ -253,7 +253,7 @@ public class BLUEclose21 extends OpMode {
             case 30:
                 follower.setMaxPower(0.9);
                 follower.followPath(huiqufashe1, true);
-                turret.setTargetAngle(-53.0);
+                turret.setTargetAngle(-52.5);
                 flywheel.setTargetRPM(3250.0);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(31);
@@ -265,7 +265,7 @@ public class BLUEclose21 extends OpMode {
                 break;
             case 315:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
-                    intakeShooter.startPrecisionShoot(0.52);
+                    intakeShooter.startPrecisionShoot(0.485);
                     setPathState(32);
                 }
                 break;
@@ -277,7 +277,7 @@ public class BLUEclose21 extends OpMode {
                 follower.setMaxPower(1);
                 follower.followPath(kaimenzuo1, true);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(3150.0);
                 setPathState(41);
                 break;
             case 41:
@@ -294,8 +294,7 @@ public class BLUEclose21 extends OpMode {
             // ================== 第5阶段：发射（第1次开门后）==================
             case 50:
                 follower.followPath(huiqufashe2, true);
-                turret.setTargetAngle(-53.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(3150.0);
                 intakeShooter.setIntakePower(1.0); // 发射同时可以保持吸
                 setPathState(51);
                 break;
@@ -306,7 +305,7 @@ public class BLUEclose21 extends OpMode {
                 break;
             case 515:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
-                    intakeShooter.startPrecisionShoot(0.52);
+                    intakeShooter.startPrecisionShoot(0.49);
                     setPathState(52);
                 }
                 break;
@@ -317,7 +316,7 @@ public class BLUEclose21 extends OpMode {
             case 60:
                 follower.followPath(kaimenzuo2, true);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(3200.0);
                 setPathState(61);
                 break;
             case 61:
@@ -334,8 +333,7 @@ public class BLUEclose21 extends OpMode {
             // ================== 第7阶段：发射（第2次开门后）==================
             case 70:
                 follower.followPath(huiqufashe3, true);
-                turret.setTargetAngle(-53.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(3200.0);
                 intakeShooter.setIntakePower(1.0);
                 setPathState(71);
                 break;
@@ -346,7 +344,7 @@ public class BLUEclose21 extends OpMode {
                 break;
             case 715:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
-                    intakeShooter.startPrecisionShoot(0.52);
+                    intakeShooter.startPrecisionShoot(0.5);
                     setPathState(72);
                 }
                 break;
@@ -358,7 +356,7 @@ public class BLUEclose21 extends OpMode {
             case 80:
                 follower.followPath(xidiyipai, false);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(3200.0);
                 setPathState(81);
                 break;
             case 81:
@@ -368,8 +366,7 @@ public class BLUEclose21 extends OpMode {
             // ================== 第9阶段：发射（吸完第一排后）==================
             case 90:
                 follower.followPath(huiqufashe4, true);
-                turret.setTargetAngle(-53.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(3200.0);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(91);
                 break;
@@ -391,7 +388,7 @@ public class BLUEclose21 extends OpMode {
             case 100:
                 follower.followPath(kaimenzuo3, true);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(3200.0);
                 setPathState(101);
                 break;
             case 101:
@@ -408,8 +405,7 @@ public class BLUEclose21 extends OpMode {
             // ================== 第11阶段：发射（第3次开门后）==================
             case 110:
                 follower.followPath(huiqufashe5, true);
-                turret.setTargetAngle(-53.0);
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(3200.0);
                 intakeShooter.setIntakePower(1.0);
                 setPathState(111);
                 break;
@@ -433,7 +429,7 @@ public class BLUEclose21 extends OpMode {
                 follower.followPath(kaimenzuo4, true);
                 intakeShooter.setIntakePower(1.0);
 
-                flywheel.setTargetRPM(3250.0);
+                flywheel.setTargetRPM(3200.0);
 
                 setPathState(121);
                 break;

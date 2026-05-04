@@ -34,9 +34,9 @@ public class BLUECustom1Plus5Auto extends OpMode {
     // 核心参数设定
     private final double TARGET_RPM = 4090.0;
     private final double TARGET_PITCH = 1.0;
-    private final double TURRET_SHOOT_ANGLE = -68.0;
+    private final double TURRET_SHOOT_ANGLE = -67.5;
     private final double CHASSIS_SETTLE_TIME = 0.3; // 底盘到位校准时间
-    private final double INTAKE_WAIT_TIME = 0.3;    // 角落吸取等待时间
+    private final double INTAKE_WAIT_TIME = 0.2;    // 角落吸取等待时间
     // ==================================================
 
     public PathChain startToShoot;
@@ -57,7 +57,7 @@ public class BLUECustom1Plus5Auto extends OpMode {
     private final Pose preIntake3Pose = new Pose(40.000, 34.000, Math.toRadians(180));
     private final Pose corner3Pose = new Pose(10.000, 34.000, Math.toRadians(180));
     private final Pose cornerAPose = new Pose(10.000, 10.000, Math.toRadians(180));
-    private final Pose cornerBPose = new Pose(12.000, 34.000, Math.toRadians(180));
+    private final Pose cornerBPose = new Pose(12.000, 29.000, Math.toRadians(180));
 
     public void buildPaths() {
         // 起点到发射点
@@ -116,7 +116,7 @@ public class BLUECustom1Plus5Auto extends OpMode {
                 if (pathTimer.getElapsedTimeSeconds() >= CHASSIS_SETTLE_TIME) setPathState(13);
                 break;
             case 13:
-                if (flywheel.getCurrentRPM() >= 4070.0) {
+                if (flywheel.getCurrentRPM() >= 4030.0) {
                     intakeShooter.startPrecisionShoot(GlobalConstants.SHOOT_TIME_NORMAL);
                     setPathState(14);
                 }
@@ -152,13 +152,13 @@ public class BLUECustom1Plus5Auto extends OpMode {
             case 33:
                 // 吸取等待
                 if (pathTimer.getElapsedTimeSeconds() >= INTAKE_WAIT_TIME) {
-                    intakeShooter.setIntakePower(0.0); // <-- 修改点：在返回前提前关闭 Intake
                     follower.followPath(corner3ToShoot, true);
                     setPathState(34);
                 }
                 break;
             case 34:
                 if (!follower.isBusy()) {
+                    intakeShooter.setIntakePower(0.0);
                     setPathState(35);
                 }
                 break;
@@ -195,13 +195,13 @@ public class BLUECustom1Plus5Auto extends OpMode {
                 if (pathTimer.getElapsedTimeSeconds() >= INTAKE_WAIT_TIME) setPathState(23);
                 break;
             case 23:
-                intakeShooter.setIntakePower(0.0);
                 if (cycleCount % 2 == 0) follower.followPath(cornerAToShoot, true);
                 else follower.followPath(cornerBToShoot, true);
                 setPathState(24);
                 break;
             case 24:
                 if (!follower.isBusy()) {
+                    intakeShooter.setIntakePower(0.0);
                     setPathState(25);
                 }
                 break;

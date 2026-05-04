@@ -67,7 +67,7 @@ public class REDclose21 extends OpMode {
                         new BezierCurve(
                                 new Pose(96.000, 86.000),
                                 new Pose(83.346, 54.923),
-                                new Pose(131.00, 59.000)
+                                new Pose(132.00, 59.000)
                         )
                 )
                 .setConstantHeadingInterpolation(Math.toRadians(0))
@@ -85,7 +85,7 @@ public class REDclose21 extends OpMode {
                 .build();
 
         //TODO:TTT
-        double kaimenzuox = 132.7;
+        double kaimenzuox = 132.5;
         double kaimenzuoy = 60.3;
 
         kaimenzuo1 = follower.pathBuilder()
@@ -93,7 +93,7 @@ public class REDclose21 extends OpMode {
                         new BezierCurve(
                                 new Pose(94.000, 80.000),
                                 new Pose(99.000, 61.3000),
-                                new Pose(kaimenzuox, 60)
+                                new Pose(kaimenzuox, 60.3)
                         )
                 )
                 .setLinearHeadingInterpolation(Math.toRadians(0), Math.toRadians(24))
@@ -102,7 +102,7 @@ public class REDclose21 extends OpMode {
         huiqufashe2 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(kaimenzuox, kaimenzuoy),
+                                new Pose(kaimenzuox-0.5, kaimenzuoy-0.5),
                                 new Pose(99.000, 61.3000),
                                 new Pose(95.000, 83.000)
                         )
@@ -124,7 +124,7 @@ public class REDclose21 extends OpMode {
         huiqufashe3 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(kaimenzuox, kaimenzuoy),
+                                new Pose(kaimenzuox-0.5, kaimenzuoy-0.5),
                                 new Pose(99.000, 61.3000),
                                 new Pose(95.000, 83.000)
                         )
@@ -136,7 +136,7 @@ public class REDclose21 extends OpMode {
                 .addPath(
                         new BezierLine(
                                 new Pose(95.000, 83.000),
-                                new Pose(125.000, 83.000)
+                                new Pose(126.000, 83.000)
                         )
                 )
                 .setConstantHeadingInterpolation(Math.toRadians(0))
@@ -166,7 +166,7 @@ public class REDclose21 extends OpMode {
         huiqufashe5 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(kaimenzuox, kaimenzuoy),
+                                new Pose(kaimenzuox-0.5, kaimenzuoy-0.5),
                                 new Pose(99.000, 61.3000),
                                 new Pose(95.000, 83.000)
                         )
@@ -188,7 +188,7 @@ public class REDclose21 extends OpMode {
         huiqufashe6 = follower.pathBuilder()
                 .addPath(
                         new BezierCurve(
-                                new Pose(kaimenzuox, kaimenzuoy),
+                                new Pose(kaimenzuox-0.5, kaimenzuoy-0.5),
                                 new Pose(99.000, 61.3000),
                                 new Pose(86.000, 100.000)
                         )
@@ -207,7 +207,7 @@ public class REDclose21 extends OpMode {
             // ================== 第1阶段：停靠并发射 ==================
             case 10:
                 // 修改：将跑打(false)改为停靠(true)
-                flywheel.setTargetRPM(3250);
+                flywheel.setTargetRPM(3150);
                 follower.followPath(fasheyuzhi, true);
                 turret.setTargetAngle(48.0);
                 // 修改：目标转速设为3600
@@ -242,7 +242,7 @@ public class REDclose21 extends OpMode {
                 follower.followPath(xidierpai, false);
                 intakeShooter.setBBServo(0.0);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3200); // 提前准备后续RPM
+                flywheel.setTargetRPM(3150); // 提前准备后续RPM
                 setPathState(21);
                 break;
             case 21:
@@ -253,8 +253,8 @@ public class REDclose21 extends OpMode {
             case 30:
                 follower.setMaxPower(0.9);
                 follower.followPath(huiqufashe1, true);
-                turret.setTargetAngle(53.0);
-                flywheel.setTargetRPM(3200);
+                turret.setTargetAngle(54.7);
+                flywheel.setTargetRPM(3150);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(31);
                 break;
@@ -265,7 +265,7 @@ public class REDclose21 extends OpMode {
                 break;
             case 315:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
-                    intakeShooter.startPrecisionShoot(0.52);
+                    intakeShooter.startPrecisionShoot(0.49);
                     setPathState(32);
                 }
                 break;
@@ -277,7 +277,7 @@ public class REDclose21 extends OpMode {
                 follower.setMaxPower(1);
                 follower.followPath(kaimenzuo1, true);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3200);
+                flywheel.setTargetRPM(3150);
                 setPathState(41);
                 break;
             case 41:
@@ -286,7 +286,7 @@ public class REDclose21 extends OpMode {
                 }
                 break;
             case 42:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.6) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.65) {
                     setPathState(50);
                 }
                 break;
@@ -294,8 +294,8 @@ public class REDclose21 extends OpMode {
             // ================== 第5阶段：发射（第1次开门后）==================
             case 50:
                 follower.followPath(huiqufashe2, true);
-                turret.setTargetAngle(53.0);
-                flywheel.setTargetRPM(3200);
+                turret.setTargetAngle(54.3);
+                flywheel.setTargetRPM(3150);
                 intakeShooter.setIntakePower(1.0); // 发射同时可以保持吸
                 setPathState(51);
                 break;
@@ -317,7 +317,7 @@ public class REDclose21 extends OpMode {
             case 60:
                 follower.followPath(kaimenzuo2, true);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3200);
+                flywheel.setTargetRPM(3150);
                 setPathState(61);
                 break;
             case 61:
@@ -334,8 +334,8 @@ public class REDclose21 extends OpMode {
             // ================== 第7阶段：发射（第2次开门后）==================
             case 70:
                 follower.followPath(huiqufashe3, true);
-                turret.setTargetAngle(56.0);
-                flywheel.setTargetRPM(3200);
+                turret.setTargetAngle(57.0);
+                flywheel.setTargetRPM(3150);
                 intakeShooter.setIntakePower(1.0);
                 setPathState(71);
                 break;
@@ -358,7 +358,7 @@ public class REDclose21 extends OpMode {
             case 80:
                 follower.followPath(xidiyipai, false);
                 intakeShooter.setIntakePower(1.0);
-                flywheel.setTargetRPM(3200);
+                flywheel.setTargetRPM(3150);
                 setPathState(81);
                 break;
             case 81:
@@ -369,7 +369,7 @@ public class REDclose21 extends OpMode {
             case 90:
                 follower.followPath(huiqufashe4, true);
                 turret.setTargetAngle(52.0);
-                flywheel.setTargetRPM(3200);
+                flywheel.setTargetRPM(3150);
                 intakeShooter.setIntakePower(0.0);
                 setPathState(91);
                 break;
@@ -400,7 +400,7 @@ public class REDclose21 extends OpMode {
                 }
                 break;
             case 102:
-                if (pathTimer.getElapsedTimeSeconds() >= 0.6) {
+                if (pathTimer.getElapsedTimeSeconds() >= 0.7) {
                     setPathState(110);
                 }
                 break;
@@ -408,8 +408,8 @@ public class REDclose21 extends OpMode {
             // ================== 第11阶段：发射（第3次开门后）==================
             case 110:
                 follower.followPath(huiqufashe5, true);
-                turret.setTargetAngle(55.0);
-                flywheel.setTargetRPM(3200);
+                turret.setTargetAngle(56.0);
+                flywheel.setTargetRPM(3150);
                 intakeShooter.setIntakePower(1.0);
                 setPathState(111);
                 break;
@@ -431,6 +431,7 @@ public class REDclose21 extends OpMode {
             case 120:
                 follower.setMaxPower(1);
                 follower.followPath(kaimenzuo4, true);
+                turret.setTargetAngle(55.0);
                 intakeShooter.setIntakePower(1.0);
 
                 flywheel.setTargetRPM(3200);
@@ -443,7 +444,7 @@ public class REDclose21 extends OpMode {
                 }
                 break;
             case 122:
-                if (pathTimer.getElapsedTimeSeconds() >= 1.1) {
+                if (pathTimer.getElapsedTimeSeconds() >= 1.25) {
                     setPathState(130);
                 }
                 break;
@@ -464,7 +465,7 @@ public class REDclose21 extends OpMode {
                 break;
             case 1315:
                 if (pathTimer.getElapsedTimeSeconds() >= 0) {
-                    intakeShooter.startPrecisionShoot(0.52);
+                    intakeShooter.startPrecisionShoot(0.49);
                     setPathState(132);
                 }
                 break;
